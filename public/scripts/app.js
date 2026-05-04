@@ -4,6 +4,13 @@
     const chatList = document.getElementById('chatList');
     const chatInput = document.getElementById('chatInput');
     const shade = document.getElementById('shade');
+    const sayGenerateButton = document.getElementById('generateSay');
+    const sayStyleButton = document.getElementById('styleSay');
+    const sayRerollButton = document.getElementById('rerollSay');
+    const editGenerateButton = document.getElementById('generateEdit');
+    const editStyleButton = document.getElementById('styleEdit');
+    const spaceGenerateButton = document.getElementById('generateSpace');
+    const spaceLikeMeButton = document.getElementById('spaceLikeMe');
     const replyGenerateButton = document.getElementById('generateReply');
     let selectedOriginalMsg = '';
     let selectedReplySource = null;
@@ -455,7 +462,7 @@
       }));
     }
 
-    function getReplyRequestContext() {
+    function getAiGenerationContext(options = {}) {
       const thread = chatThreads[currentChatId] || chatThreads.pcg;
       const persona = currentPersona();
       const profile = currentChatReadProfiles[currentChatId] || currentChatReadProfiles.pcg;
@@ -465,12 +472,25 @@
 
       return {
         threadTitle: thread.title,
-        sourceName: selectedReplySource && selectedReplySource.name ? selectedReplySource.name : '',
+        sourceName: options.sourceName || '',
         personaKey: persona[0],
         personaLabel: persona[1],
         personaDesc: persona[2],
-        readSummary
+        readSummary,
+        conversation: options.includeConversation === false ? [] : getReplyContextMessages()
       };
+    }
+
+    function getReplyRequestContext() {
+      return getAiGenerationContext({
+        sourceName: selectedReplySource && selectedReplySource.name ? selectedReplySource.name : ''
+      });
+    }
+
+    function getAssistApiUrl() {
+      return window.location.protocol === 'file:'
+        ? 'http://127.0.0.1:3000/api/assist-generate'
+        : '/api/assist-generate';
     }
 
     function setReplyLoading(loading) {
@@ -478,8 +498,35 @@
       replyGenerateButton.textContent = loading ? '生成中...' : '生成回复建议';
     }
 
+    function setButtonLoading(button, loading, loadingText) {
+      if (!button) return;
+      if (!button.dataset.defaultText) button.dataset.defaultText = button.textContent;
+      button.disabled = loading;
+      button.textContent = loading ? loadingText : button.dataset.defaultText;
+    }
+
+    function setSayLoading(loading, reroll = false) {
+      setButtonLoading(sayGenerateButton, loading, reroll ? '换一批中...' : '生成中...');
+      setButtonLoading(sayRerollButton, loading, '换一批中...');
+      sayStyleButton.disabled = loading;
+    }
+
+    function setEditLoading(loading) {
+      setButtonLoading(editGenerateButton, loading, '修改中...');
+      editStyleButton.disabled = loading;
+    }
+
+    function setSpaceLoading(loading) {
+      setButtonLoading(spaceGenerateButton, loading, '生成中...');
+      spaceLikeMeButton.disabled = loading;
+    }
+
     function renderReplyNotice(message) {
       document.getElementById('replyResults').innerHTML = `<div class="warn show">${escapeHtml(message)}</div>`;
+    }
+
+    function renderResultNotice(containerId, message) {
+      document.getElementById(containerId).innerHTML = `<div class="warn show">${escapeHtml(message)}</div>`;
     }
 
     async function requestReplySuggestions(original, tone, need) {
@@ -504,6 +551,26 @@
         throw new Error('接口没有返回可用的回复建议。');
       }
       return data.replies;
+    }
+
+    async function requestAssistItems(task, payload) {
+      const response = await fetch(getAssistApiUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task,
+          ...payload
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || '生成内容失败。');
+      }
+      if (!Array.isArray(data.items) || !data.items.length) {
+        throw new Error('接口没有返回可用内容。');
+      }
+      return data.items;
     }
 
     function getEmojiForText(text) {
@@ -737,22 +804,40 @@
     document.getElementById('parseReplyVoice').addEventListener('click', () => {
       parseReplyVoice(document.getElementById('replyVoiceIntent').value.trim());
     });
-    document.getElementById('generateSay').addEventListener('click', () => {
-      renderSaySuggestions(false);
+    document.getElementById('generateSay').addEventListener('click', async () => {
+      await renderSaySuggestions(false);
     });
-    document.getElementById('rerollSay').addEventListener('click', () => {
-      renderSaySuggestions(true);
+    document.getElementById('rerollSay').addEventListener('click', async () => {
+      await renderSaySuggestions(true);
     });
-    document.getElementById('styleSay').addEventListener('click', () => {
+    document.getElementById('styleSay').addEventListener('click', async () => {
       sayLikeMe = true;
       document.getElementById('styleNoteSay').style.display = 'block';
-      renderSaySuggestions(false);
+      await renderSaySuggestions(false);
     });
 
-    function renderSaySuggestions(nextBatch) {
+    async function renderSaySuggestions(nextBatch) {
       sayBatch = nextBatch ? sayBatch + 1 : 0;
-      renderResults(document.getElementById('sayResults'), generateSay(), 'chat');
-      document.getElementById('rerollSay').style.display = 'inline-flex';
+      setSayLoading(true, nextBatch);
+      renderResultNotice('sayResults', '正在调用 DeepSeek 生成表达建议...');
+      try {
+        const items = await requestAssistItems('say', {
+          target: document.getElementById('target').value,
+          purpose: document.getElementById('purpose').value.trim(),
+          tone: activeTexts('toneChips'),
+          length: activeTexts('lengthChips').join(''),
+          likeMe: sayLikeMe,
+          rerollIndex: sayBatch,
+          ...getAiGenerationContext()
+        });
+        renderResults(document.getElementById('sayResults'), items, 'chat');
+      } catch (error) {
+        renderResultNotice('sayResults', `调用真实接口失败：${error.message}。下面先给你本地兜底建议。`);
+        renderResults(document.getElementById('sayResults'), generateSay(), 'chat', { append: true });
+      } finally {
+        document.getElementById('rerollSay').style.display = 'inline-flex';
+        setSayLoading(false, nextBatch);
+      }
     }
 
     function setVoiceStatus(status, text, type = '') {
@@ -977,16 +1062,16 @@
       return banks[sayBatch % banks.length];
     }
 
-    document.getElementById('generateEdit').addEventListener('click', () => {
-      renderEdit();
+    document.getElementById('generateEdit').addEventListener('click', async () => {
+      await renderEdit();
     });
-    document.getElementById('styleEdit').addEventListener('click', () => {
+    document.getElementById('styleEdit').addEventListener('click', async () => {
       editLikeMe = true;
       document.getElementById('styleNoteEdit').style.display = 'block';
-      renderEdit();
+      await renderEdit();
     });
 
-    function renderEdit() {
+    async function renderEdit() {
       const text = document.getElementById('editText').value.trim();
       if (!text) {
         document.getElementById('riskWarn').classList.remove('show');
@@ -995,7 +1080,23 @@
       }
       const risky = /到底|怎么还|为什么不|赶紧|快点/.test(text);
       document.getElementById('riskWarn').classList.toggle('show', risky);
-      renderResults(document.getElementById('editResults'), generateEdit(text, risky), 'chat');
+      setEditLoading(true);
+      renderResultNotice('editResults', '正在调用 DeepSeek 修改表达...');
+      try {
+        const items = await requestAssistItems('edit', {
+          text,
+          styles: activeTexts('editStyleChips'),
+          likeMe: editLikeMe,
+          risky,
+          ...getAiGenerationContext()
+        });
+        renderResults(document.getElementById('editResults'), items, 'chat');
+      } catch (error) {
+        renderResultNotice('editResults', `调用真实接口失败：${error.message}。下面先给你本地兜底建议。`);
+        renderResults(document.getElementById('editResults'), generateEdit(text, risky), 'chat', { append: true });
+      } finally {
+        setEditLoading(false);
+      }
     }
 
     function generateEdit(text, risky) {
@@ -1107,15 +1208,35 @@
     document.getElementById('openPolish').addEventListener('click', openSpacePolishPanel);
     document.getElementById('inlinePolish').addEventListener('click', openSpacePolishPanel);
 
-    document.getElementById('spaceLikeMe').addEventListener('click', () => {
+    document.getElementById('spaceLikeMe').addEventListener('click', async () => {
       spaceLikeMe = true;
       document.getElementById('spaceStyleNote').style.display = 'block';
-      renderResults(document.getElementById('spaceResults'), generateSpaceCopy(), 'space');
+      await renderSpaceSuggestions();
     });
 
-    document.getElementById('generateSpace').addEventListener('click', () => {
-      renderResults(document.getElementById('spaceResults'), generateSpaceCopy(), 'space');
+    document.getElementById('generateSpace').addEventListener('click', async () => {
+      await renderSpaceSuggestions();
     });
+
+    async function renderSpaceSuggestions() {
+      const draft = document.getElementById('spaceText').value.trim() || '复习好累';
+      setSpaceLoading(true);
+      renderResultNotice('spaceResults', '正在调用 DeepSeek 生成说说文案...');
+      try {
+        const items = await requestAssistItems('space', {
+          draft,
+          styles: activeTexts('spaceStyleChips'),
+          likeMe: spaceLikeMe,
+          ...getAiGenerationContext({ includeConversation: false })
+        });
+        renderResults(document.getElementById('spaceResults'), items, 'space');
+      } catch (error) {
+        renderResultNotice('spaceResults', `调用真实接口失败：${error.message}。下面先给你本地兜底建议。`);
+        renderResults(document.getElementById('spaceResults'), generateSpaceCopy(), 'space', { append: true });
+      } finally {
+        setSpaceLoading(false);
+      }
+    }
 
     function generateSpaceCopy() {
       const draft = document.getElementById('spaceText').value.trim() || '复习好累';

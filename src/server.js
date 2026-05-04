@@ -3,6 +3,7 @@ const path = require('node:path');
 const http = require('node:http');
 
 const config = require('./config');
+const { generateAssist } = require('./assist');
 const { fetchReplySuggestions, createError } = require('./deepseek');
 
 function startServer() {
@@ -26,6 +27,10 @@ function startServer() {
 
     if (req.method === 'POST' && url.pathname === '/api/reply-suggestions') {
       return handleReplySuggestions(req, res);
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/assist-generate') {
+      return handleAssistGenerate(req, res);
     }
 
     if (req.method === 'GET') {
@@ -82,6 +87,19 @@ async function handleReplySuggestions(req, res) {
     console.error('reply-suggestions error:', error);
     sendJson(res, error.statusCode || 500, {
       error: error.message || '生成回复建议失败。'
+    });
+  }
+}
+
+async function handleAssistGenerate(req, res) {
+  try {
+    const body = await readJsonBody(req);
+    const result = await generateAssist(body);
+    sendJson(res, 200, result);
+  } catch (error) {
+    console.error('assist-generate error:', error);
+    sendJson(res, error.statusCode || 500, {
+      error: error.message || '生成内容失败。'
     });
   }
 }
