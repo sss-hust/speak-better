@@ -35,7 +35,7 @@ function startServer() {
     sendText(res, 404, 'Not Found');
   });
 
-  server.listen(config.port, () => {
+  server.listen(config.port, '0.0.0.0', () => {
     console.log(`会说 AI 本地服务已启动: http://127.0.0.1:${config.port}`);
     console.log(`DeepSeek 模型: ${config.model}`);
     if (!config.apiKey) {
