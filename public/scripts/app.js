@@ -6,6 +6,7 @@
     const shade = document.getElementById('shade');
     const replyGenerateButton = document.getElementById('generateReply');
     let selectedOriginalMsg = '';
+    let selectedReplySource = null;
     let sayLikeMe = false;
     let editLikeMe = false;
     let spaceLikeMe = false;
@@ -56,9 +57,9 @@
         </div>
       `;
       if (!msg.me) {
-        wrap.addEventListener('contextmenu', (e) => openContextMenu(e, msg.text));
+        wrap.addEventListener('contextmenu', (e) => openContextMenu(e, msg));
         wrap.addEventListener('touchstart', (e) => {
-          wrap._pressTimer = setTimeout(() => openContextMenu(e.touches[0], msg.text), 550);
+          wrap._pressTimer = setTimeout(() => openContextMenu(e.touches[0], msg), 550);
         });
         wrap.addEventListener('touchend', () => clearTimeout(wrap._pressTimer));
       }
@@ -454,6 +455,24 @@
       }));
     }
 
+    function getReplyRequestContext() {
+      const thread = chatThreads[currentChatId] || chatThreads.pcg;
+      const persona = currentPersona();
+      const profile = currentChatReadProfiles[currentChatId] || currentChatReadProfiles.pcg;
+      const readSummary = aiSettings.hasReadStyle
+        ? aiSettings.readSummary
+        : (profile ? profile.summary((thread.messages || []).length) : '');
+
+      return {
+        threadTitle: thread.title,
+        sourceName: selectedReplySource && selectedReplySource.name ? selectedReplySource.name : '',
+        personaKey: persona[0],
+        personaLabel: persona[1],
+        personaDesc: persona[2],
+        readSummary
+      };
+    }
+
     function setReplyLoading(loading) {
       replyGenerateButton.disabled = loading;
       replyGenerateButton.textContent = loading ? '生成中...' : '生成回复建议';
@@ -464,6 +483,7 @@
     }
 
     async function requestReplySuggestions(original, tone, need) {
+      const extraContext = getReplyRequestContext();
       const response = await fetch(getReplyApiUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -471,7 +491,8 @@
           original,
           tone,
           need,
-          conversation: getReplyContextMessages()
+          conversation: getReplyContextMessages(),
+          ...extraContext
         })
       });
 
@@ -992,9 +1013,10 @@
     // =========================
     // 长按消息菜单与帮我回
     // =========================
-    function openContextMenu(e, text) {
+    function openContextMenu(e, msg) {
       e.preventDefault && e.preventDefault();
-      selectedOriginalMsg = text;
+      selectedReplySource = msg || null;
+      selectedOriginalMsg = msg && msg.text ? msg.text : '';
       const menu = document.getElementById('ctxMenu');
       const rect = document.getElementById('app').getBoundingClientRect();
       const x = Math.min((e.clientX || 80) - rect.left, 150);

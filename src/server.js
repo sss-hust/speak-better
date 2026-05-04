@@ -47,25 +47,37 @@ function startServer() {
 }
 
 async function handleReplySuggestions(req, res) {
-  if (!config.apiKey) {
-    sendJson(res, 500, { error: '服务端未配置 DEEPSEEK_API_KEY。' });
-    return;
-  }
-
   try {
     const body = await readJsonBody(req);
     const original = String(body.original || '').trim();
     const need = String(body.need || '').trim();
     const tone = normalizeTone(body.tone);
     const conversation = normalizeConversation(body.conversation);
+    const threadTitle = String(body.threadTitle || '').trim();
+    const sourceName = String(body.sourceName || '').trim();
+    const personaKey = String(body.personaKey || '').trim() || 'warm';
+    const personaLabel = String(body.personaLabel || '').trim();
+    const personaDesc = String(body.personaDesc || '').trim();
+    const readSummary = String(body.readSummary || '').trim();
 
     if (!original) {
       sendJson(res, 400, { error: '缺少原消息内容。' });
       return;
     }
 
-    const replies = await fetchReplySuggestions({ original, need, tone, conversation });
-    sendJson(res, 200, { replies });
+    const result = await fetchReplySuggestions({
+      original,
+      need,
+      tone,
+      conversation,
+      threadTitle,
+      sourceName,
+      personaKey,
+      personaLabel,
+      personaDesc,
+      readSummary
+    });
+    sendJson(res, 200, result);
   } catch (error) {
     console.error('reply-suggestions error:', error);
     sendJson(res, error.statusCode || 500, {

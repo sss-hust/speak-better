@@ -1,99 +1,128 @@
 const config = require('./config');
 const {
-  buildSeedReplies,
-  buildIntentHint,
-  shouldUseSeedReplies
+  buildReplyBrief,
+  buildFallbackReplies,
+  finalizeReplies
 } = require('./reply-seeds');
 
-async function fetchReplySuggestions({ original, need, tone, conversation }) {
-  const toneText = Array.isArray(tone) ? tone.join('、') : String(tone || '');
-  const seedReplies = buildSeedReplies(original, toneText, need);
-  const messages = buildReplyMessages({
-    original,
-    need,
-    toneText,
-    conversation,
-    seedReplies
-  });
+async function fetchReplySuggestions(input) {
+  const brief = buildReplyBrief(input);
+  const fallbackReplies = buildFallbackReplies(brief);
 
-  const response = await fetch('https://api.deepseek.com/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.apiKey}`
-    },
-    body: JSON.stringify({
-      model: config.model,
-      thinking: { type: 'disabled' },
-      response_format: { type: 'json_object' },
-      temperature: 0.3,
-      max_tokens: 320,
-      messages
-    })
-  });
-
-  const rawText = await response.text();
-  const payload = tryParseJson(rawText);
-  if (!response.ok) {
-    const message = payload && payload.error && payload.error.message
-      ? payload.error.message
-      : `DeepSeek 接口请求失败（HTTP ${response.status}）。`;
-    throw createError(response.status, message);
+  if (!config.apiKey) {
+    return {
+      replies: fallbackReplies,
+      source: 'fallback'
+    };
   }
 
-  const content = payload && payload.choices && payload.choices[0] && payload.choices[0].message
-    ? String(payload.choices[0].message.content || '').trim()
-    : '';
+  try {
+    const messages = buildReplyMessages(brief);
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: config.model,
+        thinking: { type: 'disabled' },
+        response_format: { type: 'json_object' },
+        temperature: 0.85,
+        max_tokens: 640,
+        messages
+      })
+    });
 
-  const replies = parseReplies(content);
-  if (replies.length < 3) {
-    return seedReplies;
+    const rawText = await response.text();
+    const payload = tryParseJson(rawText);
+    if (!response.ok) {
+      const message = payload && payload.error && payload.error.message
+        ? payload.error.message
+        : `DeepSeek 接口请求失败（HTTP ${response.status}）。`;
+      throw createError(response.status, message);
+    }
+
+    const content = payload && payload.choices && payload.choices[0] && payload.choices[0].message
+      ? String(payload.choices[0].message.content || '').trim()
+      : '';
+
+    const parsedReplies = parseReplies(content);
+    const replies = finalizeReplies(parsedReplies, brief);
+    if (replies.length < 3) {
+      return {
+        replies: fallbackReplies,
+        source: 'fallback'
+      };
+    }
+
+    return {
+      replies,
+      source: 'model'
+    };
+  } catch (error) {
+    console.error('deepseek reply generation failed, fallback applied:', error.message || error);
+    return {
+      replies: fallbackReplies,
+      source: 'fallback'
+    };
   }
-
-  if (shouldUseSeedReplies(original, need, replies)) {
-    return seedReplies;
-  }
-
-  return replies.slice(0, 3);
 }
 
-function buildReplyMessages({ original, need, toneText, conversation, seedReplies }) {
-  const needText = need || '没有额外要求';
-  const contextText = Array.isArray(conversation) && conversation.length
-    ? conversation.map((item) => `${item.role === 'me' ? '我' : '对方'}：${item.text}`).join('\n')
-    : '无';
-  const intentHint = buildIntentHint(original, needText, toneText);
-  const seedText = seedReplies.map((item, index) => `${index + 1}. ${item}`).join('\n');
+function buildReplyMessages(brief) {
+  const personaDirectives = brief.persona.directives.map((item, index) => `${index + 1}. ${item}`).join('\n');
+  const toneDirectives = brief.toneGuides.length
+    ? brief.toneGuides.map((item, index) => `${index + 1}. ${item.summary} ${item.directives.join(' ')}`.trim()).join('\n')
+    : '1. 没有额外 tone chips，按人格主风格执行。';
+  const bannedText = brief.bannedPhrases.join('、');
+  const mustMentionText = brief.mustMention.length ? brief.mustMention.join('、') : '无硬性关键词，但要贴合消息。';
+  const anglesText = brief.outputAngles.map((item, index) => `${index + 1}. ${item}`).join('\n');
 
   return [
     {
       role: 'system',
       content: [
-        '你是一个中文聊天回复润色助手。',
-        '你会收到 3 条已经方向正确的候选回复，你的任务是在不改变说话人立场和核心意思的前提下，把它们润色得更自然、更像真人聊天。',
-        '这些候选回复都是“我”发给“对方”的话，你绝不能反转人物关系，绝不能替对方说话。',
-        '不要把候选回复改成旁白、吐槽、分析或追问，除非原候选本身就是那个意思。',
-        '请严格返回 JSON 对象，格式为 {"replies":["...","...","..."]}。',
-        '只返回 3 条回复建议，不要附加解释、标题、序号、markdown。'
+        '你是「会说 AI」演示版的核心回复引擎。',
+        '你的任务是生成可以直接发送的中文聊天回复，让人一眼看出你真的理解了语境，而且有明确人设风格。',
+        '优先级：预设人格风格 > 当前场景目标 > tone chips > 字面礼貌。',
+        '绝对不能写成客服、秘书、公文，不能只会说套话。',
+        '你输出的是“我”要发给对方的话，不能替对方说话，不能改写成旁白解释。',
+        '请严格返回 JSON 对象，格式为 {"replies":[{"angle":"...","text":"..."},{"angle":"...","text":"..."},{"angle":"...","text":"..."}]}。',
+        '不要输出 markdown，不要解释，不要道歉。'
       ].join('\n')
     },
     {
       role: 'user',
       content: [
-        '请基于下面 3 条候选回复做润色。',
-        `对方发来的消息：${original}`,
-        `我的要求：${needText}`,
-        `语气：${toneText || '友好自然'}`,
-        `意图提示：${intentHint}`,
-        `参考前文：${contextText}`,
-        '候选回复：',
-        seedText,
-        '补充要求：',
-        '1. 只输出润色后的 3 条回复，不要分析，不要解释。',
-        '2. 保持每条回复的基本意思和人物关系，不要把“我”改成“对方”。',
-        '3. 如果候选已经自然，可以只做轻微润色，但仍然输出 3 条。',
-        '4. 每条都要适合 QQ/微信直接发送。',
-        '5. 默认使用简体中文。'
+        '你现在要帮我回复一条消息。',
+        `聊天标题：${brief.threadTitle || '未命名聊天'}`,
+        `对方身份：${brief.relationship}${brief.sourceName ? `（对方名称：${brief.sourceName}）` : ''}`,
+        `当前场景：${brief.scene.label}`,
+        `场景目标：${brief.scene.goal}`,
+        `场景说明：${brief.scene.summary}`,
+        `预设人格：${brief.personaLabel}`,
+        `人格描述：${brief.personaDesc}`,
+        '人格执行规则：',
+        personaDirectives,
+        `人格常见口吻参考：${brief.persona.habitWords.join('、')}`,
+        'tone chips 叠加要求：',
+        toneDirectives,
+        `最近风格画像：${brief.readStyleText}`,
+        '最近聊天上下文：',
+        brief.contextDigest,
+        `对方刚发来的消息：${brief.original}`,
+        `我额外补充的回复要求：${brief.need || '无'}`,
+        `必须避免的弱表达：${bannedText}`,
+        `本次最好体现的关键词或动作：${mustMentionText}`,
+        `单条建议长度：${brief.lengthHint}`,
+        '请按下面 3 个角度各生成 1 条：',
+        anglesText,
+        '补充约束：',
+        '1. 三条都要能直接发出去，且开头不要一样。',
+        '2. 要像真人聊天，不能像在汇报工作。',
+        '3. 如果是推进事项，就要把事情推进到位，不要只会礼貌接住。',
+        '4. 如果是老师场景，要得体、清晰，但也别太假。',
+        '5. 如果是幽默/抽象风格，梗只能轻轻带一下，不能盖过本意。'
       ].join('\n')
     }
   ];
@@ -114,7 +143,7 @@ function parseReplies(content) {
     .split(/\r?\n/)
     .map((line) => line.replace(/^[\-\d.\s]+/, '').trim())
     .filter(Boolean)
-    .slice(0, 3);
+    .map((line, index) => ({ angle: `候选${index + 1}`, text: line }));
 }
 
 function tryParseReplyJson(text) {
@@ -125,7 +154,15 @@ function tryParseReplyJson(text) {
     }
 
     return parsed.replies
-      .map((item) => String(item).trim())
+      .map((item, index) => {
+        if (typeof item === 'string') {
+          return { angle: `候选${index + 1}`, text: item };
+        }
+        if (item && typeof item.text === 'string') {
+          return { angle: String(item.angle || `候选${index + 1}`), text: item.text };
+        }
+        return null;
+      })
       .filter(Boolean);
   } catch (error) {
     return [];
