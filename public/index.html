@@ -1,0 +1,609 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>会说 AI - QQ 表达搭子原型</title>
+  <link rel="stylesheet" href="styles/app.css?v=20260505-mobile-input-polish" />
+</head>
+<body>
+  <main class="phone" id="app">
+    <div class="statusbar">
+      <div class="status-left"><span id="statusTime">10:38</span></div>
+      <div class="status-right">
+        <span class="alarm"><span class="hand"></span><span class="leg left"></span><span class="leg right"></span></span><span class="fiveg">5G</span><span class="bars"></span><span class="battery" id="statusBattery">82</span>
+      </div>
+    </div>
+    <!-- 页面 1：QQ 消息列表。这里有 QQ 底部四栏导航。 -->
+    <section class="view main active" id="messageView">
+      <div class="message-page">
+        <div class="profile-head">
+          <div class="big-avatar"></div>
+          <div>
+            <div class="profile-name">天光</div>
+            <div class="profile-sub">💖 好运锦鲤 ›</div>
+          </div>
+          <button class="top-plus placeholder-control" type="button" aria-disabled="true" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">＋</button>
+        </div>
+        <div class="search placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">搜索</div>
+        <div class="device-row placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">
+          <svg class="device-icon" viewBox="0 0 32 32"><rect x="6" y="7" width="20" height="15" rx="1.8" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M13 26h6M16 22v4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          <span>已登录 Windows</span><span style="margin-left:auto;">›</span>
+        </div>
+        <div class="conv chat-entry" id="openChatFromList" data-chat-id="pcg">
+          <div class="conv-avatar round">AI</div>
+          <div class="conv-body">
+            <div class="conv-title">2026PCG校园AI产品创意大赛官方沟通群</div>
+            <div class="conv-last">刘青诺：老师您好，我是用 google ai studio 做...</div>
+          </div>
+          <div class="conv-time">21:36</div>
+        </div>
+        <div class="conv placeholder-row" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">
+          <div class="conv-avatar" style="background:#1297ff;color:#fff;">🎮<span class="badge">3</span></div>
+          <div class="conv-body"><div class="conv-title">QQ游戏中心</div><div class="conv-last">卡厄思梦境定档5月28日上线</div></div>
+          <div class="conv-time">21:19</div>
+        </div>
+        <div class="conv placeholder-row" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">
+          <div class="conv-avatar" style="background:#1599ff;color:#fff;">▣</div>
+          <div class="conv-body"><div class="conv-title">我的电脑</div><div class="conv-last">你已在电脑登录，可传文件到电脑</div></div>
+          <div class="conv-time">20:20</div>
+        </div>
+        <div class="conv placeholder-row" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">
+          <div class="conv-avatar round" style="background:#fff;border:1px solid #eee;color:#12b7f5;">讯<span class="badge">4</span></div>
+          <div class="conv-body"><div class="conv-title">腾讯新闻</div><div class="conv-last">小米、iQOO巨屏新机轮番炸场，5月这些新机卷疯了</div></div>
+          <div class="conv-time">20:18</div>
+        </div>
+        <div class="conv chat-entry" data-chat-id="homework">
+          <div class="conv-avatar round" style="background:#e8fff0;color:#17864b;">组</div>
+          <div class="conv-body"><div class="conv-title">小组作业群</div><div class="conv-last">我：好的，那我好好做 PPT，请大家尽量在这周五之前把各自的部分发我哦~</div></div>
+          <div class="conv-time">周二 20:10</div>
+        </div>
+        <div class="conv chat-entry" data-chat-id="mentor">
+          <div class="conv-avatar round" style="background:#0e9bff;color:#fff;">李</div>
+          <div class="conv-body"><div class="conv-title">李老师</div><div class="conv-last">我：好的好的。</div></div>
+          <div class="conv-time">周一 16:00</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 页面 2：QQ群聊详情。这里没有 QQ 底部四栏，只有聊天输入栏。 -->
+    <section class="view detail" id="chatView">
+      <header class="topbar">
+        <button class="icon-btn" id="backToMessages">‹</button>
+        <div class="title" id="chatTitle">2026PCG校园AI产品创意大赛官方…（1082）</div>
+        <button class="icon-btn placeholder-control" id="jumpSpace" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">☰</button>
+      </header>
+      <div class="chat-list" id="chatList">
+        <div class="time">今天 14:20</div>
+      </div>
+      <footer class="inputbar">
+        <button class="voice qq-icon" id="chatVoice" aria-label="语音输入">
+          <svg viewBox="0 0 36 36" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><rect x="13" y="5" width="10" height="18" rx="5"/><path d="M8 17c0 7 4 11 10 11s10-4 10-11"/><path d="M18 28v4M13 32h10"/></g></svg>
+        </button>
+        <input class="chat-input" id="chatInput" placeholder="输入消息..." />
+        <button class="emoji qq-icon" id="chatEmoji" aria-label="表情">
+          <svg viewBox="0 0 36 36" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="18" cy="18" r="13"/><path d="M12.5 15.5h.1M23.5 15.5h.1" stroke-width="4"/><path d="M12 21c2 3 10 3 12 0"/></g></svg>
+        </button>
+        <button class="plus qq-icon" id="plusBtn" aria-label="加号菜单"></button>
+        <button class="send" id="sendBtn">发送</button>
+        <div class="chat-voice-status" id="chatVoiceStatus" aria-live="polite"></div>
+      </footer>
+      <section class="emoji-panel" id="emojiPanel" aria-label="表情面板">
+        <button data-emoji="🥺">🥺</button>
+        <button data-emoji="😂">😂</button>
+        <button data-emoji="😭">😭</button>
+        <button data-emoji="🥲">🥲</button>
+        <button data-emoji="😅">😅</button>
+        <button data-emoji="🤔">🤔</button>
+        <button data-emoji="😎">😎</button>
+        <button data-emoji="🙏">🙏</button>
+        <button data-emoji="👍">👍</button>
+        <button data-emoji="❤️">❤️</button>
+        <button data-emoji="✨">✨</button>
+        <button data-emoji="🎉">🎉</button>
+        <button data-emoji="😵‍💫">😵‍💫</button>
+        <button data-emoji="😡">😡</button>
+        <button data-emoji="🙌">🙌</button>
+        <button data-emoji="💪">💪</button>
+      </section>
+      <button class="assistant-float" id="assistantFloat" aria-label="会说AI浮窗，点击打开助手，长按或右键进入详情">
+        <span class="penguin-head" aria-hidden="true"></span>
+        <span>会说</span>
+      </button>
+    </section>
+
+    <section class="view detail ai-page" id="aiDetailView">
+      <div class="ai-detail-native">
+        <article class="ai-native-pane active" data-native-detail="overview">
+          <button class="ai-back" id="backAiDetail">‹</button>
+          <div class="ai-hero">
+            <div>
+              <div class="ai-kicker">QQ 里的 AI 表达搭子</div>
+              <h1>会说 AI</h1>
+              <p>更懂你的表达助手</p>
+            </div>
+            <div class="penguin-figure penguin-hood" aria-hidden="true"></div>
+          </div>
+          <div class="ai-panel ai-stats">
+            <div class="ai-stat"><div><b id="enabledFeatureCount">5</b><span>已开启功能</span></div></div>
+            <div class="ai-stat"><div><b id="personaCount">5</b><span>可选人格</span></div></div>
+            <div class="ai-stat"><div><b id="toneHealth">86%</b><span>语气健康度</span></div></div>
+          </div>
+
+          <button class="ai-manager-card" id="goFeatureManager">
+            <span><b>功能管理</b><span>统一设置 6 个表达能力的开关</span></span>
+            <i>›</i>
+          </button>
+
+          <div class="ai-section-title">常用功能</div>
+          <div class="ai-feature-grid" id="overviewFeatureGrid"></div>
+
+          <div class="ai-section-title">
+            <span>说话人格</span>
+            <button class="ai-link" id="goPersonaManager">更多人格 ›</button>
+          </div>
+          <div class="persona-list" id="overviewPersonaList"></div>
+
+          <div class="ai-section-title">输入体验预览</div>
+          <div class="ai-panel">
+            <div class="ai-preview">
+              <button id="aiPreviewVoice" aria-label="语音输入">)))</button>
+              <input id="aiPreviewInput" placeholder="输入消息" />
+              <button id="aiPreviewPlus" aria-label="加号">＋</button>
+              <button id="aiPreviewSay">会说</button>
+            </div>
+            <div class="ai-preview-status" id="aiPreviewStatus">点击语音后开始监听，说完后才会填入内容。</div>
+          </div>
+          <button class="detail-cta" id="startAiExperience">开始体验会说 AI</button>
+        </article>
+
+        <article class="ai-native-pane" data-native-detail="features">
+          <button class="ai-back" data-native-goto="overview">‹</button>
+          <div class="ai-hero">
+            <div>
+              <h1>功能管理</h1>
+              <p>管理常用表达能力</p>
+            </div>
+            <div class="penguin-figure" aria-hidden="true"></div>
+          </div>
+          <div class="ai-panel ai-stats">
+            <div class="ai-stat"><div><b id="featureEnabledStat">5</b><span>已开启</span></div></div>
+            <div class="ai-stat"><div><b id="recommendedFeatureStat">1</b><span>推荐功能</span></div></div>
+            <div class="ai-stat"><div><b id="entryVisibleStat">已显示</b><span>输入框入口</span></div></div>
+          </div>
+          <div class="ai-panel" id="featureToggleList"></div>
+          <div class="ai-panel">
+            <div class="feature-row">
+              <div class="feature-symbol">!</div>
+              <div class="feature-copy"><b>推荐体验：语气风险提醒</b><span>帮你识别潜在语气风险，表达更得体</span></div>
+              <button class="ai-link" id="tryRiskFeature">去体验</button>
+            </div>
+          </div>
+          <div class="ai-panel">
+            <div class="ai-section-title" style="margin-top:0;">输入体验预览</div>
+            <div class="ai-preview">
+              <button id="featurePreviewVoice" aria-label="语音输入">)))</button>
+              <input id="featurePreviewInput" placeholder="输入消息" />
+              <button>＋</button>
+              <button id="featurePreviewSay">会说</button>
+            </div>
+            <div class="ai-preview-status" id="featurePreviewStatus">语音会调用浏览器真实识别；也可以直接打字体验。</div>
+          </div>
+          <button class="detail-cta" id="saveFeatureSettings">保存设置</button>
+          <div class="save-state" id="featureSaveState"></div>
+        </article>
+
+        <article class="ai-native-pane" data-native-detail="personas">
+          <button class="ai-back" data-native-goto="overview">‹</button>
+          <div class="ai-hero">
+            <div>
+              <h1>说话人格</h1>
+              <p>选择更适合你的表达方式</p>
+            </div>
+            <div class="penguin-figure penguin-hood" aria-hidden="true"></div>
+          </div>
+          <div class="ai-panel" id="currentPersonaCard"></div>
+          <div class="ai-section-title">可选人格</div>
+          <div class="persona-list" id="personaOptionList"></div>
+          <div class="ai-panel">
+            <div class="ai-section-title" style="margin-top:0;">默认应用范围</div>
+            <div class="scope-grid" id="scopeGrid"></div>
+          </div>
+          <button class="detail-cta" id="savePersonaSettings">保存我的人格设置</button>
+          <div class="save-state" id="personaSaveState"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 页面 3：QQ 空间主页。动态页进入后先到这里。 -->
+    <section class="view detail" id="qzoneView">
+      <div class="qzone-view">
+        <div class="qzone-hero">
+          <div class="qzone-top">
+            <button class="qzone-round-btn" id="backQzoneToDynamic" aria-label="返回">
+              <svg viewBox="0 0 32 32"><path d="M20 7 11 16l9 9"/></svg>
+            </button>
+            <div class="qzone-top-actions">
+              <button class="qzone-love placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">空友爱看</button>
+              <button class="qzone-round-btn placeholder-control" aria-label="通知" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><svg viewBox="0 0 32 32"><path d="M10 24h12M12 24c0 2 1.5 3.5 4 3.5s4-1.5 4-3.5"/><path d="M9 21V14c0-4 3-7 7-7s7 3 7 7v7"/></svg></button>
+              <button class="qzone-round-btn placeholder-control" aria-label="设置" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="4"/><path d="M16 4v4M16 24v4M4 16h4M24 16h4M7.5 7.5l2.8 2.8M21.7 21.7l2.8 2.8M24.5 7.5l-2.8 2.8M10.3 21.7l-2.8 2.8"/></svg></button>
+            </div>
+          </div>
+          <div class="qzone-profile">
+            <div class="qzone-avatar"></div>
+            <div>
+              <div class="qzone-name">天光</div>
+              <div class="qzone-visitors">访客总量 2.3万</div>
+            </div>
+          </div>
+        </div>
+        <div class="qzone-entry-grid">
+          <button class="qzone-entry" id="openQzoneTalk"><svg viewBox="0 0 32 32"><path d="M7 8h18v13H13l-6 4v-4H7V8Z"/><path d="M12 14h8"/></svg><span>说说</span></button>
+          <button class="qzone-entry placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><svg viewBox="0 0 32 32"><path d="M10 6h12v20l-6-4-6 4V6Z"/></svg><span>日志</span></button>
+          <button class="qzone-entry placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><svg viewBox="0 0 32 32"><rect x="7" y="8" width="18" height="16" rx="3"/><path d="M9 22l5-5 4 3 3-4 4 5"/><circle cx="13" cy="13" r="1.5"/></svg><span>相册</span></button>
+          <button class="qzone-entry placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><svg viewBox="0 0 32 32"><rect x="8" y="11" width="16" height="14" rx="2"/><path d="M12 11V8h8v3M12 16h8"/></svg><span>留言</span></button>
+          <button class="qzone-entry placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><svg viewBox="0 0 32 32"><path d="M8 10h16M8 16h16M8 22h16"/></svg><span>更多</span></button>
+        </div>
+        <div class="qzone-share" id="openQzoneTalkFromShare">
+          分享新鲜事...
+          <div class="share-icons">
+            <svg viewBox="0 0 32 32"><rect x="7" y="8" width="16" height="15" rx="3"/><path d="M23 17l4-3v12l-4-3M11 20l4-4 3 3"/></svg>
+            <svg viewBox="0 0 32 32"><path d="M9 20c1.8-5.5 5.8-9 12-10"/><path d="M20 7l2 4 4 2-4 2-2 4-2-4-4-2 4-2 2-4Z"/><text x="8" y="25" font-size="10" font-weight="900" fill="currentColor" stroke="none">AI</text></svg>
+          </div>
+        </div>
+        <div class="qzone-post">
+          <div class="qzone-post-head"><div class="qzone-post-avatar">南师</div><span>@南京师范大学💕表白墙</span><span class="qzone-post-more">...</span></div>
+          <div class="qzone-mosaic">
+            <div>墙墙，想和帅哥做朋友</div><div>找个台球搭子</div><div>新赛季队友太天才了</div>
+            <div>队友本人有点菜</div><div>09:56</div><div>想收一个羽毛球</div>
+          </div>
+          <div class="qzone-meta">今天 11:32</div>
+          <div class="qzone-like">👍 打饭吃觉睡六花、Rina、Akihi 3人赞了</div>
+          <div class="qzone-comment"><div class="qzone-avatar" style="width:30px;height:30px;"></div><input class="qzone-comment-input" placeholder="说点什么吧..." /></div>
+        </div>
+        <div class="qzone-section-title">空友爱看 <span style="font-size:13px;color:#999;font-weight:700;">ⓘ</span></div>
+        <div class="qzone-phone-nav">
+          <svg viewBox="0 0 32 32"><path d="M7 10h18M7 16h18M7 22h18"/></svg>
+          <svg viewBox="0 0 32 32"><path d="M5 17 16 7l11 10v10H9V17"/></svg>
+          <svg viewBox="0 0 32 32"><path d="M22 9h-8c-5 0-8 3-8 7s3 7 8 7h8"/><path d="M17 14l5-5-5-5"/></svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- 页面 4：QQ 空间说说列表。写说说前先进入这里。 -->
+    <section class="view detail" id="qzoneTalkView">
+      <div class="qzone-view" style="display:flex;flex-direction:column;">
+        <div class="qzone-talk-head">
+          <button class="qzone-round-btn dark" id="backTalkToQzone" aria-label="返回"><svg viewBox="0 0 32 32"><path d="M20 7 11 16l9 9"/></svg></button>
+          <div class="title">说说</div>
+          <button class="qzone-round-btn dark placeholder-control" aria-label="日历" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><svg viewBox="0 0 32 32"><rect x="6" y="8" width="20" height="18" rx="3"/><path d="M11 5v6M21 5v6M6 14h20"/></svg></button>
+        </div>
+        <div class="qzone-talk-body">
+          <div class="talk-card-grid">
+            <button class="talk-action-card" id="openComposeFromTalk"><svg viewBox="0 0 32 32"><path d="M7 8h18v13H13l-6 4v-4H7V8Z"/><path d="M12 14h8"/></svg><span>写说说</span></button>
+            <button class="talk-action-card placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><svg viewBox="0 0 32 32"><rect x="8" y="8" width="16" height="17" rx="4"/><path d="M12 16l3 3 6-7"/></svg><span>签到</span></button>
+          </div>
+          <div class="talk-feed">
+            <div class="talk-author"><div class="qzone-avatar" style="width:42px;height:42px;"></div><span>天光</span><span style="margin-left:auto;color:#111;">...</span></div>
+            <p>咳咳咳，当我把去迪士尼游玩的照片喂给AI，也是提前体验熟女风了。好喜欢这个法式大波浪🥳🥳🥳🥳。</p>
+            <p>In 2026, Be happier，趁着 gap year，多走走玩玩。</p>
+            <div class="talk-grid">
+              <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+            </div>
+            <div class="qzone-meta">01-13 17:28<br>▯ iQOO Z9 Turbo（5G）<br>◎ 751</div>
+            <div class="qzone-like">👍 天光、华智祥、黄紫祥、夏若彤学姐、陈可盈、子衿等36人赞了</div>
+            <div class="qzone-comment"><div class="qzone-avatar" style="width:30px;height:30px;"></div><input class="qzone-comment-input" placeholder="说点什么吧..." /></div>
+          </div>
+        </div>
+        <div class="qzone-phone-nav">
+          <svg viewBox="0 0 32 32"><path d="M7 10h18M7 16h18M7 22h18"/></svg>
+          <svg viewBox="0 0 32 32"><path d="M5 17 16 7l11 10v10H9V17"/></svg>
+          <svg viewBox="0 0 32 32"><path d="M22 9h-8c-5 0-8 3-8 7s3 7 8 7h8"/><path d="M17 14l5-5-5-5"/></svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- 页面 5：QQ 空间写说说页。这里是独立发布页，没有 QQ 底部四栏。 -->
+    <section class="view compose" id="spaceView">
+      <header class="topbar">
+        <button class="text-btn" id="cancelSpace">取消</button>
+        <div class="title">写说说</div>
+        <div>
+          <button class="space-ai-mode">QQ脑洞秀</button>
+          <button class="publish-chip" id="publishBtn">发表</button>
+        </div>
+      </header>
+      <div class="space-editor">
+        <div class="compose-card">
+          <textarea class="space-text" id="spaceText" placeholder="分享新鲜事..."></textarea>
+          <div style="width:112px;height:112px;background:#f3f3f3;border-radius:4px;display:grid;place-items:center;color:#8b8b8b;margin-top:8px;">
+            <div style="text-align:center;font-size:13px;line-height:1.7;">🖼️<br>照片/视频</div>
+          </div>
+          <div class="compose-inline">
+            <button class="inline-pill placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">@ 好友</button>
+            <button class="inline-pill placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">🏷 添加标签</button>
+            <button class="inline-pill placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">📍 所在位置</button>
+            <button class="inline-pill ai" id="inlinePolish">✨ AI配文</button>
+          </div>
+        </div>
+      </div>
+      <div class="space-actions">
+        <button class="polish" id="openPolish">✨ 润色一下</button>
+        <div class="space-row placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><span>👁️ 权限设置</span><span>所有人可见</span></div>
+        <div class="space-row placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><span>⚙️ 发表设置</span><span></span></div>
+        <div class="space-row single"><span>投稿至「空间爱看」<br><small style="color:#999;font-weight:400;">今日还可投稿3次 ⓘ</small></span><span>⚪</span></div>
+      </div>
+    </section>
+
+    <!-- 页面 4：QQ 动态列表。这里有 QQ 底部四栏导航。 -->
+    <section class="view main" id="dynamicView">
+      <div class="dynamic-page">
+        <div class="dynamic-white">
+          <div class="dynamic-top">
+            <div class="big-avatar" style="width:46px;height:46px;"></div>
+            <span>动态</span>
+            <div class="dynamic-icons placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">
+              <svg class="qsvg" viewBox="0 0 32 32"><path d="M7 16c0-6 4-10 10-10 2 0 4 1 5 2l3-2-1 5c1 2 1 3 1 5 0 6-5 10-10 10S7 22 7 16Z"/><path d="M11 12l3 3M23 12l-3 3M12 20c3 2 7 2 10 0"/></svg>
+              <svg class="qsvg" viewBox="0 0 32 32"><circle cx="9" cy="9" r="4"/><circle cx="23" cy="9" r="4"/><circle cx="9" cy="23" r="4"/><circle cx="23" cy="23" r="4"/></svg>
+            </div>
+          </div>
+          <div class="search placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">搜索</div>
+          <div class="dynamic-list">
+            <div class="dynamic-item" id="openSpaceFromDynamic"><span class="left-icon"><svg class="qsvg" viewBox="0 0 32 32"><path d="M16 3.6 20 11.1 28.4 12.7 22.6 18.9 23.7 27.4 16 23.8 8.3 27.4 9.4 18.9 3.6 12.7 12 11.1 16 3.6Z"/><path d="M11 15.3c3.4-.8 6.8-1 10.1-.6L11.8 21c3.4.1 6.5-.2 9.2-1.1"/></svg></span><span>空间动态</span><span class="arrow">›</span></div>
+            <div class="dynamic-item placeholder-row" id="openSpaceWrite" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><span class="left-icon"><svg class="qsvg" viewBox="0 0 32 32"><path d="M20 4.8c4.7 1.7 7.7 6 7.7 11 0 2.4-.7 4.5-1.9 6.3l-2.1 2.6c-.7.9-1.1 1.9-1.1 3"/><path d="M11.9 26.9c-4.7-1.7-7.6-6-7.6-11.1 0-2.3.6-4.5 1.8-6.3"/><path d="M6.7 7.5c1.4-1.3 3.1-2.2 5-2.7"/><path d="M5.2 5.8l1.1 2.3 2.4 1.1-2.4 1.1-1.1 2.3-1.1-2.3-2.3-1.1 2.3-1.1 1.1-2.3Z" fill="currentColor" stroke="none"/><path d="M12.8 2.7l.8 1.6 1.6.8-1.6.8-.8 1.6-.8-1.6-1.6-.8 1.6-.8.8-1.6Z" fill="currentColor" stroke="none"/><path d="M17.7 7.1l1.5 3.1 3.1 1.5-3.1 1.5-1.5 3.1-1.5-3.1-3.1-1.5 3.1-1.5 1.5-3.1Z" fill="currentColor" stroke="none"/></svg></span><span>脑洞秀</span><span class="arrow">›</span></div>
+            <div class="dynamic-item placeholder-row" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><span class="left-icon"><svg class="qsvg game-center-icon" viewBox="0 0 32 32"><path d="M6.4 17.9c.7-5 3-8 6.4-7.2l2.1.7c.7.2 1.5.2 2.2 0l2.1-.7c3.4-.8 5.7 2.2 6.4 7.2.7 5.1-.9 8.6-3.7 8.6-1.7 0-3-1.4-4.2-3.6h-3.4c-1.2 2.2-2.5 3.6-4.2 3.6-2.8 0-4.4-3.5-3.7-8.6Z"/><circle cx="11.1" cy="17.5" r="1.9"/><path d="M20.6 15.1v6M17.6 18.1h6"/><circle cx="25.1" cy="15.6" r=".8" fill="currentColor" stroke="none"/><circle cx="25.1" cy="20.8" r=".8" fill="currentColor" stroke="none"/></svg></span><span>游戏中心</span><span class="hint">洛克新精灵登场</span><span class="arrow">›</span></div>
+            <div class="dynamic-item placeholder-row" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><span class="left-icon"><svg class="qsvg" viewBox="0 0 32 32"><circle cx="16" cy="9.4" r="5.7"/><circle cx="16.7" cy="8.6" r="1.1" fill="currentColor" stroke="none"/><path d="M16 15.1v8.1"/><path d="M9.3 27.1c1.4-3.1 4-4.6 6.7-4.6s5.3 1.5 6.7 4.6"/><path d="M7.7 24.6c2-2.4 4.8-3.5 8.3-3.5s6.3 1.1 8.3 3.5"/></svg></span><span>小游戏</span><span class="arrow">›</span></div>
+            <div class="dynamic-item placeholder-row" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><span class="left-icon"><svg class="qsvg" viewBox="0 0 32 32"><path d="M16 26.6V14.8"/><path d="M15.8 15.1c-5.5 0-9.2-3.5-9.2-8.2 5.6 0 9.2 3.6 9.2 8.2Z"/><path d="M16.2 15.1c5.5 0 9.2-3.5 9.2-8.2-5.6 0-9.2 3.6-9.2 8.2Z"/><path d="M7 26.5 16 22l9 4.5-9 3.1-9-3.1Z"/></svg></span><span>QQ经典农场</span><span class="arrow">›</span></div>
+            <div class="dynamic-item placeholder-row" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><span class="left-icon"><svg class="qsvg" viewBox="0 0 32 32"><path d="M8.2 25.8h18.7L21.5 5.3 5.3 18.9c-2.1 1.8-.8 6.9 2.9 6.9Z"/><path d="M10.8 25.8c-.8-2.9-.5-5.5.8-7.8"/><path d="M27.2 25.8h2.2"/><path d="M15.1 17.4c.2 2.2 1 3.9 2.2 4.9"/><path d="M22 16.8c-.8 1.7-.7 3.1.3 4.1"/></svg></span><span>小说与动漫</span><span class="hint">来吻我</span><span class="arrow">›</span></div>
+          </div>
+        </div>
+        <div class="dynamic-blank"></div>
+      </div>
+    </section>
+
+    <!-- QQ 主页面底部 Tab：只在消息列表/动态列表出现 -->
+    <nav class="tabs" id="qqTabs">
+      <button class="tab active" data-view="messages"><b><svg class="qsvg tab-icon" viewBox="0 0 32 32"><path d="M6 8h20v13H13l-6 4v-4H6V8Z"/></svg></b>消息</button>
+      <button class="tab placeholder-tab" data-view="channel" aria-disabled="true" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><b><svg class="qsvg tab-icon" viewBox="0 0 32 32"><path d="M13 6 9 26M23 6l-4 20M6 13h20M5 21h20"/></svg></b>频道</button>
+      <button class="tab placeholder-tab" data-view="contacts" aria-disabled="true" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><b><svg class="qsvg tab-icon" viewBox="0 0 32 32"><circle cx="16" cy="11" r="5"/><path d="M7 26c1-6 17-6 18 0"/></svg></b>联系人</button>
+      <button class="tab" data-view="dynamic"><b><svg class="qsvg tab-icon dynamic-tab-icon" viewBox="0 0 32 32"><path d="M18.3 5.4c5.2 1 9.2 5.6 9.2 11.1 0 1.6-.4 3.2-1 4.5"/><path d="M23.5 25.1c-2 1.7-4.6 2.7-7.5 2.7-6.3 0-11.3-5-11.3-11.3 0-5.4 3.8-10 8.9-11"/><path d="M23.2 7.5l1.2 2.5 2.5 1.2-2.5 1.2-1.2 2.5-1.2-2.5-2.5-1.2 2.5-1.2 1.2-2.5Z" fill="currentColor" stroke="none"/></svg></b>动态</button>
+    </nav>
+
+    <!-- 全局遮罩 -->
+    <div class="shade" id="shade"></div>
+    <div class="placeholder-toast" id="placeholderToast">鹅目前只负责帮你说话，别的功能……就等鹅下次展示！</div>
+
+    <div class="ai-entry-menu" id="aiEntryMenu" aria-label="会说AI入口菜单">
+      <button id="aiMenuFloat">浮窗形式</button>
+      <button id="aiMenuDetail">进入详情页</button>
+    </div>
+
+    <!-- 加号面板 -->
+    <section class="drawer" id="plusDrawer">
+      <div class="grid">
+        <div class="tool ai" id="openAssistant"><div class="tool-icon penguin-tool-icon"><span class="penguin-head"></span></div><span>会说AI</span></div>
+        <div class="tool placeholder-tool" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><div class="tool-icon line-icon photo"></div><span>照片</span></div>
+        <div class="tool placeholder-tool" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><div class="tool-icon line-icon camera"></div><span>拍摄</span></div>
+        <div class="tool placeholder-tool" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><div class="tool-icon line-icon call"></div><span>语音通话</span></div>
+        <div class="tool placeholder-tool" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><div class="tool-icon line-icon video"></div><span>视频通话</span></div>
+        <div class="tool placeholder-tool" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><div class="tool-icon line-icon location"></div><span>位置</span></div>
+        <div class="tool placeholder-tool" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><div class="tool-icon line-icon file"></div><span>文件</span></div>
+        <div class="tool placeholder-tool" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！"><div class="tool-icon line-icon redpacket"></div><span>红包</span></div>
+      </div>
+    </section>
+
+    <!-- 会说 AI 助手 -->
+    <section class="assistant" id="assistant">
+      <div class="panel-head">
+        <div class="panel-title">✨ 会说AI助手</div>
+        <button class="close" data-close="assistant">×</button>
+      </div>
+      <div class="panel-body">
+        <div class="seg">
+          <button class="active" id="sayTab">帮我说</button>
+          <button id="editTab">帮我改</button>
+        </div>
+
+        <div id="sayPane">
+          <h3 style="margin:0 0 10px;font-size:16px;">帮我说 - 不知道怎么开口？告诉AI</h3>
+          <div class="voice-intent">
+            <label for="voiceIntent">先打字告诉 AI 你想说什么</label>
+            <div class="private-input-shell">
+              <textarea id="voiceIntent" placeholder="比如：给小组成员发一段委婉一点、简短一点的话，催他今晚把作业初稿发我。"></textarea>
+              <button class="mic-btn compact-mic" id="voiceSay" aria-label="语音识别">
+                <svg viewBox="0 0 24 24"><path d="M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3Z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3M8 21h8"/></svg>
+              </button>
+            </div>
+            <div class="voice-sub" id="voiceStatus">语音只是辅助入口，公共场合直接打字也可以。</div>
+            <button class="mini-action" id="parseVoice">从这句话拆分可选项</button>
+          </div>
+          <details class="optional-fields">
+            <summary>补充对象、目的、语气和长度（可选）</summary>
+            <div class="optional-body">
+              <div class="form-row">
+                <label>对象</label>
+                <select id="target">
+                  <option value="" selected>不指定</option>
+                  <option>老师</option>
+                  <option>同学</option>
+                  <option>小组成员</option>
+                  <option>朋友</option>
+                  <option>男朋友/女朋友</option>
+                  <option>亲人</option>
+                  <option>暧昧对象</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label>目的</label>
+                <input class="small-input" id="purpose" placeholder="例如：想请假、催交作业、委婉拒绝、安慰朋友" />
+              </div>
+              <div class="form-row">
+                <label>语气</label>
+                <div class="chips" id="toneChips">
+                  <button class="chip">礼貌</button>
+                  <button class="chip">委婉</button>
+                  <button class="chip">有边界</button>
+                  <button class="chip">高情商</button>
+                  <button class="chip">抽象</button>
+                  <button class="chip">发疯</button>
+                  <button class="chip">真诚</button>
+                  <button class="chip">傲娇</button>
+                  <button class="chip">幽默</button>
+                </div>
+              </div>
+              <div class="form-row">
+                <label>长度</label>
+                <div class="chips" id="lengthChips">
+                  <button class="chip">简短</button>
+                  <button class="chip">适中</button>
+                  <button class="chip">详细</button>
+                </div>
+              </div>
+            </div>
+          </details>
+          <div class="assistant-actions">
+            <button class="primary" id="generateSay">生成建议</button>
+            <button class="ghost" id="styleSay">🎭 像我说</button>
+            <button class="reroll" id="rerollSay">不满意，换一批</button>
+          </div>
+          <p id="styleNoteSay" style="display:none;color:#667;font-size:12px;">已临时参考你最近消息风格：句尾常用“呀 / ~”，偶尔会带“🥲”。</p>
+          <div class="results" id="sayResults"></div>
+        </div>
+
+        <div id="editPane" style="display:none;">
+          <h3 style="margin:0 0 10px;font-size:16px;">帮我改 - 这话太硬？换个说法</h3>
+          <div class="voice-intent">
+            <label for="editText">输入想修改的原句</label>
+            <div class="private-input-shell">
+              <textarea id="editText" rows="4" placeholder="例如：你到底什么时候交作业？"></textarea>
+              <button class="mic-btn compact-mic" id="voiceEdit" aria-label="语音输入要修改的句子">
+                <svg viewBox="0 0 24 24"><path d="M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3Z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3M8 21h8"/></svg>
+              </button>
+            </div>
+            <div class="voice-sub" id="voiceEditStatus">不方便开口时直接打字；右侧麦克风只是可选辅助。</div>
+            <div class="field-hint">这里不会自动生成参考，点击“修改”后才会出现结果。</div>
+          </div>
+          <details class="optional-fields">
+            <summary>补充修改要求和风格（可选）</summary>
+            <div class="optional-body">
+              <div class="form-row">
+                <label>修改要求</label>
+                <textarea id="editVoiceIntent" placeholder="例如：改得委婉一点，别太像质问。"></textarea>
+                <button class="mini-action" id="parseEditVoice">从要求里提取原句</button>
+              </div>
+              <div class="form-row">
+                <label>修改风格</label>
+                <div class="chips" id="editStyleChips">
+                  <button class="chip">更礼貌</button>
+                  <button class="chip">更委婉</button>
+                  <button class="chip">更正式</button>
+                  <button class="chip">更有梗</button>
+                  <button class="chip">更抽象</button>
+                  <button class="chip">更真诚</button>
+                </div>
+              </div>
+            </div>
+          </details>
+          <button class="primary" id="generateEdit">修改</button>
+          <button class="ghost" id="styleEdit">🎭 像我说</button>
+          <p id="styleNoteEdit" style="display:none;color:#667;font-size:12px;">已临时参考你最近消息风格：更短、更口语，会自然带一点“哈哈/🥲”。</p>
+          <div class="warn" id="riskWarn">⚠️ 这句话可能让对方感觉被质问，已为您生成更温和的版本。</div>
+          <div class="results" id="editResults"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 长按菜单 -->
+    <div class="context-menu" id="ctxMenu">
+    </div>
+
+    <!-- 帮我回模态框 -->
+    <section class="reply-modal" id="replyModal">
+      <div class="panel-head">
+        <div class="panel-title">让会说AI帮你回复</div>
+        <button class="close" data-close="replyModal">×</button>
+      </div>
+      <div class="panel-body">
+        <label>原消息</label>
+        <div class="quote" id="quotedMsg"></div>
+        <div class="voice-intent">
+          <label for="replyNeed">你想怎么回复？</label>
+          <div class="private-input-shell">
+            <textarea class="small-input" id="replyNeed" placeholder="例如：幽默一点回复，顺便催一下进度。"></textarea>
+            <button class="mic-btn compact-mic" id="voiceReply" aria-label="语音输入回复要求">
+              <svg viewBox="0 0 24 24"><path d="M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3Z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3M8 21h8"/></svg>
+            </button>
+          </div>
+          <div class="voice-sub" id="voiceReplyStatus">长按消息后，可以直接打字说明回复目的。</div>
+        </div>
+        <details class="optional-fields">
+          <summary>补充回复要求和语气（可选）</summary>
+          <div class="optional-body">
+            <div class="form-row">
+              <label>更完整的回复要求</label>
+              <textarea id="replyVoiceIntent" placeholder="例如：帮我幽默一点回复，顺便催一下进度。"></textarea>
+              <button class="mini-action" id="parseReplyVoice">填入回复要求</button>
+            </div>
+            <div class="chips" id="replyToneChips">
+              <button class="chip">友好</button>
+              <button class="chip">幽默</button>
+              <button class="chip">感谢</button>
+              <button class="chip">拒绝</button>
+              <button class="chip">高冷</button>
+              <button class="chip">抽象</button>
+            </div>
+          </div>
+        </details>
+        <button class="primary" id="generateReply">生成回复建议</button>
+        <div class="results" id="replyResults"></div>
+      </div>
+    </section>
+
+    <!-- QQ 空间润色面板 -->
+    <section class="space-panel" id="spacePanel">
+      <div class="panel-head">
+        <div class="panel-title">✨ 润色一下</div>
+        <button class="close" data-close="spacePanel">×</button>
+      </div>
+      <div class="panel-body">
+        <div class="space-current-draft">
+          <label>当前说说草稿</label>
+          <textarea id="spaceDraftPreview" rows="3" placeholder="可以直接在这里输入想发的内容，再选择风格润色。"></textarea>
+        </div>
+        <label>选择风格</label>
+        <div class="chips" id="spaceStyleChips">
+          <button class="chip active">自然日常版</button>
+          <button class="chip">日常碎碎念</button>
+          <button class="chip">抽象有梗版</button>
+          <button class="chip">高情商版</button>
+          <button class="chip">情绪氛围版</button>
+          <button class="chip">文艺伤感风</button>
+          <button class="chip">励志元气风</button>
+        </div>
+        <button class="primary" id="generateSpace">生成</button>
+        <button class="ghost" id="spaceLikeMe">更像我说</button>
+        <p id="spaceStyleNote" style="display:none;color:#667;font-size:12px;">已参考历史说说风格：短句、轻微抽象、喜欢用“救命/本人/🥲”。</p>
+        <div class="results" id="spaceResults"></div>
+        <details class="optional-fields space-rewrite">
+          <summary>重新编辑或换一段内容</summary>
+          <div class="optional-body">
+            <div class="voice-intent">
+              <label for="spaceVoiceIntent">输入新的说说草稿</label>
+              <div class="private-input-shell">
+                <textarea id="spaceVoiceIntent" placeholder="今天复习好累，帮我润色成自然日常一点。"></textarea>
+                <button class="mic-btn compact-mic" id="voiceSpace" aria-label="语音输入说说草稿">
+                  <svg viewBox="0 0 24 24"><path d="M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3Z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3M8 21h8"/></svg>
+                </button>
+              </div>
+              <div class="voice-sub" id="voiceSpaceStatus">需要重写时再输入，语音只是右侧的小辅助。</div>
+              <button class="mini-action" id="parseSpaceVoice">更新说说草稿</button>
+            </div>
+          </div>
+        </details>
+      </div>
+    </section>
+  </main>
+
+    <script src="scripts/app.js?v=20260505-mobile-input-polish"></script>
+</body>
+</html>

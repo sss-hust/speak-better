@@ -1,0 +1,12 @@
+{
+  "name": "huishuoai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "会说 AI 比赛项目",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
