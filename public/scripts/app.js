@@ -988,10 +988,19 @@
       const initialValue = input.value;
       const selectionStart = input.selectionStart ?? input.value.length;
       const selectionEnd = input.selectionEnd ?? input.value.length;
+
+      // Check secure context first - Web Speech API requires HTTPS
+      if (!window.isSecureContext) {
+        input.focus();
+        const httpsUrl = window.location.href.replace(/^http:/, 'https:').replace(/:(\d+)/, (m, p) => ':' + (Number(p) + 1));
+        setVoiceStatus(status, `语音识别需要 HTTPS 环境。请通过 HTTPS 地址访问本应用（如 ${httpsUrl}），首次访问需接受证书安全警告。当前可直接在输入框打字。`, 'error');
+        return;
+      }
+
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
         input.focus();
-        setVoiceStatus(status, '当前手机浏览器没有开放网页语音识别。已帮你定位到输入框，可以用手机键盘自带麦克风，或直接打字。', 'error');
+        setVoiceStatus(status, '当前浏览器不支持网页语音识别。已帮你定位到输入框，可以用键盘自带麦克风，或直接打字。', 'error');
         return;
       }
       const recognition = new SpeechRecognition();
@@ -1015,12 +1024,12 @@
       recognition.onerror = (event) => {
         hadSpeechError = true;
         const tips = {
-          'not-allowed': '麦克风权限被浏览器拦截了。请在地址栏权限里允许麦克风后再试。',
-          'audio-capture': '没有检测到可用麦克风，请检查电脑麦克风输入。',
+          'not-allowed': '麦克风权限被拦截。请确认：1) 使用 HTTPS 地址访问；2) 在浏览器地址栏点击锁/权限图标允许麦克风。',
+          'audio-capture': '没有检测到可用麦克风，请检查设备麦克风是否正常。',
           'no-speech': '没有听到语音，可以靠近麦克风再点一次。',
-          'network': '语音识别服务连接失败，电脑端浏览器可能暂时不可用。可以先手动输入这句话。'
+          'network': '语音识别服务连接失败，请检查网络连接。可以先手动输入。'
         };
-        setVoiceStatus(status, tips[event.error] || '没有识别成功，可以再点一次，或直接输入这句话。', 'error');
+        setVoiceStatus(status, tips[event.error] || '没有识别成功，可以再点一次，或直接输入。', 'error');
       };
       recognition.onend = () => {
         btn.classList.remove('listening');
@@ -1034,7 +1043,7 @@
         recognition.start();
       } catch (error) {
         btn.classList.remove('listening');
-        setVoiceStatus(status, '语音识别没有启动成功，请稍等一秒再点，或直接在下方输入。', 'error');
+        setVoiceStatus(status, '语音识别没有启动成功，请确认通过 HTTPS 访问且已授权麦克风权限。', 'error');
       }
     }
 
