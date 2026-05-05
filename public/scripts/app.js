@@ -190,7 +190,8 @@
       scopes: ['private', 'group', 'qzone'],
       readTarget: 'current',
       hasReadStyle: false,
-      readSummary: ''
+      readSummary: '',
+      assistCount: 0
     };
 
     function restoreAiSettings() {
@@ -200,6 +201,7 @@
         if (typeof saved.floating === 'boolean') aiSettings.floating = saved.floating;
         if (saved.persona) aiSettings.persona = saved.persona;
         if (Array.isArray(saved.scopes) && saved.scopes.length) aiSettings.scopes = saved.scopes;
+        if (typeof saved.assistCount === 'number') aiSettings.assistCount = saved.assistCount;
       } catch (error) {
         localStorage.removeItem('speakBetterAiSettings');
       }
@@ -211,9 +213,64 @@
           floating: aiSettings.floating,
           features: aiSettings.features,
           persona: aiSettings.persona,
-          scopes: aiSettings.scopes
+          scopes: aiSettings.scopes,
+          assistCount: aiSettings.assistCount || 0
         }));
       } catch (error) {}
+    }
+
+    function incrementAssistCount() {
+      aiSettings.assistCount = (aiSettings.assistCount || 0) + 1;
+      persistAiSettings();
+    }
+
+    function getGooseTier() {
+      const count = aiSettings.assistCount || 0;
+      if (count >= 30) return 'veteran';
+      if (count >= 8) return 'familiar';
+      return 'newbie';
+    }
+
+    function tapGoose() {
+      const tier = getGooseTier();
+      const replies = {
+        newbie: [
+          '🔔 叮咚！小鹅被你敲醒啦～\n很高兴认识你！如果有表达上的小烦恼，随时再来找会说AI玩哦，我们一直都在～',
+          '🔔 叮咚！小鹅被你戳到啦～\n嘿，新朋友！有什么话不知道怎么说，就来找鹅帮忙吧，鹅随时待命～',
+          '🔔 叮咚！小鹅冒泡啦～\n你好呀！不管是聊天、回复还是发说说，鹅都能帮上忙哦，快来试试吧～'
+        ],
+        familiar: [
+          '🔔 叮咚！小鹅收到你的敲击啦～\n感谢你一直陪伴会说AI！你最近的使用还挺频繁的，我们会继续努力，帮你把表达变得更轻松～',
+          '🔔 叮咚！小鹅又被你找到啦～\n最近帮你说了不少话呢，看得出来你越来越会表达了，鹅很欣慰～',
+          '🔔 叮咚！小鹅向你报到～\n老朋友好！鹅已经慢慢摸透你的风格了，以后会帮你说得更像你～'
+        ],
+        veteran: [
+          '✨ 叮咚！你的专属"敲鹅"来啦～\n感谢你一直这么爱用会说AI！你的每一次使用，我们都悄悄记在心里啦。接下来的日子，也继续陪你好好说话、轻松表达吧～',
+          '✨ 叮咚！VIP鹅为你亮相～\n你已经是鹅的铁粉啦！这么多次陪伴下来，鹅觉得你的表达力已经突飞猛进了，继续加油鸭～',
+          '✨ 叮咚！你的老伙伴鹅来了～\n能一直陪着你好好说话，是鹅最开心的事。以后也请多多指教，我们继续做最佳搭档吧～'
+        ]
+      };
+      const pool = replies[tier];
+      const reply = pool[Math.floor(Math.random() * pool.length)];
+      showGooseReply(reply);
+    }
+
+    function showGooseReply(text) {
+      const existing = document.getElementById('gooseReplyBubble');
+      if (existing) existing.remove();
+      const bubble = document.createElement('div');
+      bubble.id = 'gooseReplyBubble';
+      bubble.className = 'goose-reply-bubble show';
+      bubble.innerHTML = text.split('\n').map(line => escapeHtml(line)).join('<br>');
+      const statsPanel = document.querySelector('.ai-panel.ai-stats');
+      if (statsPanel) {
+        statsPanel.parentNode.insertBefore(bubble, statsPanel.nextSibling);
+      }
+      clearTimeout(showGooseReply._timer);
+      showGooseReply._timer = setTimeout(() => {
+        bubble.classList.remove('show');
+        setTimeout(() => bubble.remove(), 300);
+      }, 5000);
     }
 
     restoreAiSettings();
@@ -992,6 +1049,7 @@
     document.getElementById('backAiDetail').addEventListener('click', closeAiDetail);
     document.getElementById('goFeatureManager').addEventListener('click', () => showDetailScreen('features'));
     document.getElementById('goPersonaManager').addEventListener('click', () => showDetailScreen('personas'));
+    document.getElementById('tapGoose').addEventListener('click', tapGoose);
     document.querySelectorAll('[data-native-goto]').forEach(btn => {
       btn.addEventListener('click', () => showDetailScreen(btn.dataset.nativeGoto));
     });
@@ -1161,9 +1219,11 @@
           ...getAiGenerationContext()
         });
         renderResults(document.getElementById('sayResults'), items, 'chat');
+        incrementAssistCount();
       } catch (error) {
         renderResultNotice('sayResults', `调用真实接口失败：${error.message}。下面先给你本地兜底建议。`);
         renderResults(document.getElementById('sayResults'), generateSay(), 'chat', { append: true });
+        incrementAssistCount();
       } finally {
         document.getElementById('rerollSay').style.display = 'inline-flex';
         setSayLoading(false, nextBatch);
@@ -1516,9 +1576,11 @@
           ...getAiGenerationContext()
         });
         renderResults(document.getElementById('editResults'), items, 'chat');
+        incrementAssistCount();
       } catch (error) {
         renderResultNotice('editResults', `调用真实接口失败：${error.message}。下面先给你本地兜底建议。`);
         renderResults(document.getElementById('editResults'), generateEdit(text, risky), 'chat', { append: true });
+        incrementAssistCount();
       } finally {
         setEditLoading(false);
         syncFeatureAvailability();
@@ -1682,9 +1744,11 @@
       try {
         const replies = await requestReplySuggestions(selectedOriginalMsg, tone, need);
         renderResults(document.getElementById('replyResults'), replies, 'chat');
+        incrementAssistCount();
       } catch (error) {
         renderReplyNotice(`调用真实接口失败：${error.message}。下面先给你本地兜底建议。`);
         renderResults(document.getElementById('replyResults'), generateReplyFallback(selectedOriginalMsg, toneText, need), 'chat', { append: true });
+        incrementAssistCount();
       } finally {
         setReplyLoading(false);
         syncFeatureAvailability();
@@ -1799,9 +1863,11 @@
           ...getAiGenerationContext({ includeConversation: false })
         });
         renderResults(document.getElementById('spaceResults'), items, 'space');
+        incrementAssistCount();
       } catch (error) {
         renderResultNotice('spaceResults', `调用真实接口失败：${error.message}。下面先给你本地兜底建议。`);
         renderResults(document.getElementById('spaceResults'), generateSpaceCopy(), 'space', { append: true });
+        incrementAssistCount();
       } finally {
         setSpaceLoading(false);
         syncFeatureAvailability();
