@@ -696,9 +696,30 @@
       transform: translate(-50%, -8px);
       transition: opacity .18s ease, transform .18s ease;
     }
+    .placeholder-toast.with-action {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 330px;
+      text-align: left;
+      border-radius: 18px;
+    }
+    .placeholder-toast button {
+      flex: 0 0 auto;
+      border: 0;
+      border-radius: 999px;
+      background: #12b7f5;
+      color: #fff;
+      min-height: 30px;
+      padding: 0 12px;
+      font-weight: 900;
+      cursor: pointer;
+      pointer-events: auto;
+    }
     .placeholder-toast.show {
       opacity: 1;
       transform: translate(-50%, -100%);
+      pointer-events: auto;
     }
     .drawer {
       position: absolute;
@@ -977,8 +998,12 @@
       transition: .24s ease;
       max-height: 86%;
       overflow-y: auto;
+      pointer-events: none;
     }
-    .assistant.show, .reply-modal.show, .space-panel.show { transform: translateY(0); }
+    .assistant.show, .reply-modal.show, .space-panel.show {
+      transform: translateY(0);
+      pointer-events: auto;
+    }
     .panel-head {
       height: 50px;
       display: flex;
@@ -1006,6 +1031,36 @@
       cursor: pointer;
     }
     .seg button.active { background: #12b7f5; color: #fff; border-color: #12b7f5; }
+    .context-feature-toggle {
+      border: 1px solid #bfe7fb;
+      border-radius: 999px;
+      background: #eefaff;
+      color: #108fc5;
+      min-height: 34px;
+      padding: 0 12px;
+      margin: -2px 0 10px;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .context-feature-toggle.on {
+      background: #e8f8ed;
+      border-color: #bfe8cb;
+      color: #168147;
+    }
+    .feature-unavailable,
+    .seg button.feature-unavailable,
+    .primary.feature-unavailable,
+    .ghost.feature-unavailable,
+    .polish.feature-unavailable,
+    .voice-action.feature-unavailable {
+      cursor: not-allowed !important;
+    }
+    .seg button.feature-unavailable,
+    .primary.feature-unavailable,
+    .ghost.feature-unavailable {
+      border-style: dashed;
+    }
     .form-row { margin: 12px 0; }
     .voice-intent {
       border: 1px solid #dcecf6;
@@ -1270,6 +1325,23 @@
       line-height: 1.4;
     }
     .warn.show { display: block; }
+    .feature-enable-notice {
+      display: flex !important;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .feature-enable-notice button {
+      flex: 0 0 auto;
+      border: 0;
+      border-radius: 999px;
+      min-height: 32px;
+      padding: 0 12px;
+      background: #12b7f5;
+      color: #fff;
+      font-weight: 900;
+      cursor: pointer;
+    }
     .context-menu {
       display: none;
       position: absolute;
@@ -1309,6 +1381,7 @@
     }
     .context-menu button:hover { background: rgba(255,255,255,.12); }
     .context-menu .ai-menu { color:#9be7ff; font-weight:800; }
+    .context-menu .ai-menu.ai-off { color:#ffd788; }
     .quote {
       background: #f5f7f8;
       border-left: 3px solid #12b7f5;
@@ -1603,18 +1676,6 @@
       align-items:center;
       gap:8px;
     }
-    .qzone-phone-nav {
-      position: sticky;
-      bottom: 0;
-      height: 58px;
-      background:#fff;
-      display:flex;
-      justify-content:space-around;
-      align-items:center;
-      border-top:1px solid #eee;
-      color:#999;
-    }
-    .qzone-phone-nav svg { width:27px; height:27px; fill:none; stroke:currentColor; stroke-width:2.7; stroke-linecap:round; stroke-linejoin:round; }
     .qzone-talk-head {
       height: 58px;
       display:grid;
@@ -1898,7 +1959,7 @@
       transition: transform .18s ease, opacity .18s ease, border-color .18s ease;
     }
     .ai-feature-card:active { transform: scale(.98); }
-    .ai-feature-card.off { opacity: .48; }
+    .ai-feature-card.off { opacity: 1; }
     .feature-symbol {
       width: 38px;
       height: 38px;
@@ -1968,7 +2029,7 @@
       border-bottom: 1px solid #eef1f6;
     }
     .feature-row:last-child, .persona-row:last-child { border-bottom: 0; }
-    .feature-row.off { opacity: .48; }
+    .feature-row.off { opacity: 1; }
     .feature-copy, .persona-copy { min-width: 0; flex: 1; }
     .feature-copy b, .persona-copy b { display: block; font-size: 17px; margin-bottom: 4px; }
     .feature-copy span, .persona-copy span { display: block; color: #687080; font-size: 13px; line-height: 1.35; }

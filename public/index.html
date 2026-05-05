@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>会说 AI - QQ 表达搭子原型</title>
-  <link rel="stylesheet" href="styles/app.css?v=20260505-mobile-input-polish" />
+  <link rel="stylesheet" href="styles/app.css?v=20260505-context-switches" />
 </head>
 <body>
   <main class="phone" id="app">
@@ -262,11 +262,6 @@
           <div class="qzone-comment"><div class="qzone-avatar" style="width:30px;height:30px;"></div><input class="qzone-comment-input" placeholder="说点什么吧..." /></div>
         </div>
         <div class="qzone-section-title">空友爱看 <span style="font-size:13px;color:#999;font-weight:700;">ⓘ</span></div>
-        <div class="qzone-phone-nav">
-          <svg viewBox="0 0 32 32"><path d="M7 10h18M7 16h18M7 22h18"/></svg>
-          <svg viewBox="0 0 32 32"><path d="M5 17 16 7l11 10v10H9V17"/></svg>
-          <svg viewBox="0 0 32 32"><path d="M22 9h-8c-5 0-8 3-8 7s3 7 8 7h8"/><path d="M17 14l5-5-5-5"/></svg>
-        </div>
       </div>
     </section>
 
@@ -295,11 +290,6 @@
             <div class="qzone-comment"><div class="qzone-avatar" style="width:30px;height:30px;"></div><input class="qzone-comment-input" placeholder="说点什么吧..." /></div>
           </div>
         </div>
-        <div class="qzone-phone-nav">
-          <svg viewBox="0 0 32 32"><path d="M7 10h18M7 16h18M7 22h18"/></svg>
-          <svg viewBox="0 0 32 32"><path d="M5 17 16 7l11 10v10H9V17"/></svg>
-          <svg viewBox="0 0 32 32"><path d="M22 9h-8c-5 0-8 3-8 7s3 7 8 7h8"/><path d="M17 14l5-5-5-5"/></svg>
-        </div>
       </div>
     </section>
 
@@ -323,7 +313,6 @@
             <button class="inline-pill placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">@ 好友</button>
             <button class="inline-pill placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">🏷 添加标签</button>
             <button class="inline-pill placeholder-control" title="鹅目前只负责帮你说话，别的功能……就等鹅下次展示！">📍 所在位置</button>
-            <button class="inline-pill ai" id="inlinePolish">✨ AI配文</button>
           </div>
         </div>
       </div>
@@ -406,6 +395,7 @@
 
         <div id="sayPane">
           <h3 style="margin:0 0 10px;font-size:16px;">帮我说 - 不知道怎么开口？告诉AI</h3>
+          <button class="context-feature-toggle" type="button" data-feature-context-toggle="say" aria-pressed="true">帮我说已开启</button>
           <div class="voice-intent">
             <label for="voiceIntent">先打字告诉 AI 你想说什么</label>
             <div class="private-input-shell">
@@ -472,6 +462,7 @@
 
         <div id="editPane" style="display:none;">
           <h3 style="margin:0 0 10px;font-size:16px;">帮我改 - 这话太硬？换个说法</h3>
+          <button class="context-feature-toggle" type="button" data-feature-context-toggle="rewrite" aria-pressed="true">帮我改已开启</button>
           <div class="voice-intent">
             <label for="editText">输入想修改的原句</label>
             <div class="private-input-shell">
@@ -480,8 +471,7 @@
                 <svg viewBox="0 0 24 24"><path d="M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3Z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3M8 21h8"/></svg>
               </button>
             </div>
-            <div class="voice-sub" id="voiceEditStatus">不方便开口时直接打字；右侧麦克风只是可选辅助。</div>
-            <div class="field-hint">这里不会自动生成参考，点击“修改”后才会出现结果。</div>
+            <div class="voice-sub" id="voiceEditStatus"></div>
           </div>
           <details class="optional-fields">
             <summary>补充修改要求和风格（可选）</summary>
@@ -524,6 +514,7 @@
         <button class="close" data-close="replyModal">×</button>
       </div>
       <div class="panel-body">
+        <button class="context-feature-toggle" type="button" data-feature-context-toggle="reply" aria-pressed="true">帮我回已开启</button>
         <label>原消息</label>
         <div class="quote" id="quotedMsg"></div>
         <div class="voice-intent">
@@ -534,7 +525,7 @@
               <svg viewBox="0 0 24 24"><path d="M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3Z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3M8 21h8"/></svg>
             </button>
           </div>
-          <div class="voice-sub" id="voiceReplyStatus">长按消息后，可以直接打字说明回复目的。</div>
+          <div class="voice-sub" id="voiceReplyStatus"></div>
         </div>
         <details class="optional-fields">
           <summary>补充回复要求和语气（可选）</summary>
@@ -566,6 +557,7 @@
         <button class="close" data-close="spacePanel">×</button>
       </div>
       <div class="panel-body">
+        <button class="context-feature-toggle" type="button" data-feature-context-toggle="polish" aria-pressed="true">润色一下已开启</button>
         <div class="space-current-draft">
           <label>当前说说草稿</label>
           <textarea id="spaceDraftPreview" rows="3" placeholder="可以直接在这里输入想发的内容，再选择风格润色。"></textarea>
@@ -595,7 +587,7 @@
                   <svg viewBox="0 0 24 24"><path d="M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3Z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3M8 21h8"/></svg>
                 </button>
               </div>
-              <div class="voice-sub" id="voiceSpaceStatus">需要重写时再输入，语音只是右侧的小辅助。</div>
+              <div class="voice-sub" id="voiceSpaceStatus"></div>
               <button class="mini-action" id="parseSpaceVoice">更新说说草稿</button>
             </div>
           </div>
@@ -604,6 +596,6 @@
     </section>
   </main>
 
-    <script src="scripts/app.js?v=20260505-mobile-input-polish"></script>
+    <script src="scripts/app.js?v=20260505-context-switches"></script>
 </body>
 </html>

@@ -41,9 +41,9 @@
         title: '小组作业群（5）',
         timeLabel: '星期二 20:10',
         messages: [
-          { me:false, avatar:'', avatarClass:'avatar-a', name:'DING', time:'20:03', text:'我把分工表发群里了，大家看一下，有问题今晚前说。' },
-          { me:false, avatar:'', avatarClass:'avatar-b', name:'怀冬', time:'20:05', text:'我负责案例和竞品分析，数据那块谁来补？' },
-          { me:false, avatar:'', avatarClass:'avatar-c', name:'脸红的泡泡玛特', time:'20:08', text:'我可以整理问卷结果，但是结论部分还需要一起对一下。' },
+          { me:false, avatar:'', avatarClass:'avatar-a', name:'周子航', time:'20:03', text:'我把分工表发群里了，大家看一下，有问题今晚前说。' },
+          { me:false, avatar:'', avatarClass:'avatar-b', name:'林小雨', time:'20:05', text:'我负责案例和竞品分析，数据那块谁来补？' },
+          { me:false, avatar:'', avatarClass:'avatar-c', name:'陈予安', time:'20:08', text:'我可以整理问卷结果，但是结论部分还需要一起对一下。' },
           { me:true, avatar:'', avatarClass:'avatar-me', name:'我', time:'20:10', text:'好的，那我好好做 PPT，请大家尽量在这周五之前把各自的部分发我哦~' }
         ]
       },
@@ -137,7 +137,7 @@
 
     function showShade() { shade.classList.add('show'); }
     function hideShade() { shade.classList.remove('show'); }
-    function showPlaceholderToast(message = '鹅目前只负责帮你说话，别的功能……就等鹅下次展示！', event = null) {
+    function showPlaceholderToast(message = '鹅目前只负责帮你说话，别的功能……就等鹅下次展示！', event = null, actionText = '', onAction = null) {
       const toast = document.getElementById('placeholderToast');
       if (!toast) return;
       const appRect = document.getElementById('app').getBoundingClientRect();
@@ -146,12 +146,21 @@
       const rawY = event && Number.isFinite(event.clientY) ? event.clientY : sourceRect.top + sourceRect.height / 2;
       const x = Math.max(150, Math.min(appRect.width - 150, rawX - appRect.left));
       const y = Math.max(62, Math.min(appRect.height - 22, rawY - appRect.top));
-      toast.textContent = message;
+      toast.innerHTML = `<span>${escapeHtml(message)}</span>${actionText ? `<button type="button">${escapeHtml(actionText)}</button>` : ''}`;
+      const actionButton = toast.querySelector('button');
+      if (actionButton && typeof onAction === 'function') {
+        actionButton.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toast.classList.remove('show');
+          onAction();
+        }, { once: true });
+      }
       toast.style.left = `${x}px`;
       toast.style.top = `${y}px`;
+      toast.classList.toggle('with-action', Boolean(actionText));
       toast.classList.add('show');
       clearTimeout(showPlaceholderToast.timer);
-      showPlaceholderToast.timer = setTimeout(() => toast.classList.remove('show'), 1800);
+      showPlaceholderToast.timer = setTimeout(() => toast.classList.remove('show'), actionText ? 3600 : 1800);
     }
 
     const aiFeatureMeta = [
@@ -183,6 +192,31 @@
       hasReadStyle: false,
       readSummary: ''
     };
+
+    function restoreAiSettings() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('speakBetterAiSettings') || '{}');
+        if (saved.features) aiSettings.features = { ...aiSettings.features, ...saved.features };
+        if (typeof saved.floating === 'boolean') aiSettings.floating = saved.floating;
+        if (saved.persona) aiSettings.persona = saved.persona;
+        if (Array.isArray(saved.scopes) && saved.scopes.length) aiSettings.scopes = saved.scopes;
+      } catch (error) {
+        localStorage.removeItem('speakBetterAiSettings');
+      }
+    }
+
+    function persistAiSettings() {
+      try {
+        localStorage.setItem('speakBetterAiSettings', JSON.stringify({
+          floating: aiSettings.floating,
+          features: aiSettings.features,
+          persona: aiSettings.persona,
+          scopes: aiSettings.scopes
+        }));
+      } catch (error) {}
+    }
+
+    restoreAiSettings();
     const chatReadTargets = {
       current: {
         label: '当前群聊',
@@ -277,6 +311,7 @@
 
     function setAssistantFloating(enabled) {
       aiSettings.floating = enabled;
+      persistAiSettings();
       document.getElementById('assistantFloat').classList.toggle('show', enabled);
       document.getElementById('aiMenuFloat').textContent = enabled ? '关闭浮窗' : '浮窗形式';
       renderAiDetail();
@@ -342,6 +377,92 @@
       return Object.values(aiSettings.features).filter(Boolean).length;
     }
 
+    function getFeatureTitle(key) {
+      const item = aiFeatureMeta.find(([featureKey]) => featureKey === key);
+      return item ? item[1] : '这个功能';
+    }
+
+    function featureDisabledMessage(key) {
+      return `「${getFeatureTitle(key)}」已在功能管理中关闭，开启后才能使用。`;
+    }
+
+    function isFeatureEnabled(key) {
+      return Boolean(aiSettings.features[key]);
+    }
+
+    function enableFeatureFromContext(key, afterEnable = null) {
+      aiSettings.features[key] = true;
+      persistAiSettings();
+      renderAiDetail();
+      syncFeatureAvailability();
+      if (typeof afterEnable === 'function') afterEnable();
+    }
+
+    function toggleFeatureFromContext(key) {
+      aiSettings.features[key] = !aiSettings.features[key];
+      persistAiSettings();
+      renderAiDetail();
+      syncFeatureAvailability();
+    }
+
+    function showFeatureDisabled(key, event = null, afterEnable = null) {
+      showPlaceholderToast(featureDisabledMessage(key), event, '开启', () => enableFeatureFromContext(key, afterEnable));
+    }
+
+    function ensureFeature(key, event = null, afterEnable = null) {
+      if (isFeatureEnabled(key)) return true;
+      showFeatureDisabled(key, event, afterEnable);
+      return false;
+    }
+
+    function renderEnableNotice(containerId, key, afterEnable = null) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      container.innerHTML = `
+        <div class="warn show feature-enable-notice">
+          <span>${escapeHtml(featureDisabledMessage(key))}</span>
+          <button type="button">开启${escapeHtml(getFeatureTitle(key))}</button>
+        </div>
+      `;
+      container.querySelector('button').addEventListener('click', () => enableFeatureFromContext(key, afterEnable));
+    }
+
+    function setFeatureAvailability(id, enabled) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.toggle('feature-unavailable', !enabled);
+      el.setAttribute('aria-disabled', String(!enabled));
+    }
+
+    function syncFeatureAvailability() {
+      setFeatureAvailability('sayTab', isFeatureEnabled('say'));
+      setFeatureAvailability('editTab', isFeatureEnabled('rewrite'));
+      setFeatureAvailability('generateSay', isFeatureEnabled('say'));
+      setFeatureAvailability('rerollSay', isFeatureEnabled('say'));
+      setFeatureAvailability('voiceSay', isFeatureEnabled('say'));
+      setFeatureAvailability('parseVoice', isFeatureEnabled('say'));
+      setFeatureAvailability('styleSay', isFeatureEnabled('say') && isFeatureEnabled('likeMe'));
+      setFeatureAvailability('generateEdit', isFeatureEnabled('rewrite'));
+      setFeatureAvailability('voiceEdit', isFeatureEnabled('rewrite'));
+      setFeatureAvailability('parseEditVoice', isFeatureEnabled('rewrite'));
+      setFeatureAvailability('styleEdit', isFeatureEnabled('rewrite') && isFeatureEnabled('likeMe'));
+      setFeatureAvailability('generateReply', isFeatureEnabled('reply'));
+      setFeatureAvailability('voiceReply', isFeatureEnabled('reply'));
+      setFeatureAvailability('parseReplyVoice', isFeatureEnabled('reply'));
+      setFeatureAvailability('openPolish', isFeatureEnabled('polish'));
+      setFeatureAvailability('generateSpace', isFeatureEnabled('polish'));
+      setFeatureAvailability('voiceSpace', isFeatureEnabled('polish'));
+      setFeatureAvailability('parseSpaceVoice', isFeatureEnabled('polish'));
+      setFeatureAvailability('spaceLikeMe', isFeatureEnabled('polish') && isFeatureEnabled('likeMe'));
+      document.querySelectorAll('[data-feature-context-toggle]').forEach(button => {
+        const key = button.dataset.featureContextToggle;
+        const enabled = isFeatureEnabled(key);
+        button.classList.toggle('on', enabled);
+        button.textContent = `${getFeatureTitle(key)}${enabled ? '已开启' : '已关闭'}`;
+        button.setAttribute('aria-pressed', String(enabled));
+      });
+    }
+
     function currentPersona() {
       return aiPersonaMeta.find(item => item[0] === aiSettings.persona) || aiPersonaMeta[0];
     }
@@ -352,7 +473,17 @@
       card.type = 'button';
       card.dataset.featureKey = key;
       card.innerHTML = `<div class="feature-symbol symbol-${key}">${symbol}</div><b>${title}</b><p>${desc}</p>`;
-      card.addEventListener('click', openAssistantPanel);
+      card.addEventListener('click', (event) => {
+        if (!ensureFeature(key, event, () => card.click())) return;
+        if (key === 'rewrite' || key === 'risk') {
+          openAssistantPanel('edit', event);
+        } else if (key === 'polish') {
+          switchView('space');
+          openSpacePolishPanel(event);
+        } else {
+          openAssistantPanel('say', event);
+        }
+      });
       return card;
     }
 
@@ -366,7 +497,9 @@
       `;
       row.querySelector('.switch').addEventListener('click', () => {
         aiSettings.features[key] = !aiSettings.features[key];
+        persistAiSettings();
         renderAiDetail();
+        syncFeatureAvailability();
       });
       return row;
     }
@@ -383,6 +516,7 @@
       `;
       row.addEventListener('click', () => {
         aiSettings.persona = key;
+        persistAiSettings();
         renderAiDetail();
         if (compact) showDetailScreen('personas');
       });
@@ -396,6 +530,8 @@
       document.getElementById('featureEnabledStat').textContent = enabled;
       document.getElementById('personaCount').textContent = aiPersonaMeta.length;
       document.getElementById('entryVisibleStat').textContent = aiSettings.floating ? '浮窗' : '已显示';
+      document.getElementById('assistantFloat').classList.toggle('show', aiSettings.floating);
+      document.getElementById('aiMenuFloat').textContent = aiSettings.floating ? '关闭浮窗' : '浮窗形式';
 
       const overviewGrid = document.getElementById('overviewFeatureGrid');
       overviewGrid.innerHTML = '';
@@ -436,11 +572,13 @@
           } else {
             aiSettings.scopes.push(key);
           }
+          persistAiSettings();
           renderAiDetail();
         });
         scopeGrid.appendChild(chip);
       });
 
+      syncFeatureAvailability();
     }
 
     function startPreviewSpeech(buttonId, inputId, statusId) {
@@ -462,12 +600,16 @@
     function usePreviewInput(inputId, statusId) {
       const input = document.getElementById(inputId);
       const status = document.getElementById(statusId);
+      if (!ensureFeature('say', null, () => usePreviewInput(inputId, statusId))) {
+        status.textContent = featureDisabledMessage('say');
+        return;
+      }
       if (!input.value.trim()) {
         input.value = '帮我委婉催一下小组作业';
       }
       status.textContent = '已把预览内容带入聊天输入框。';
       chatInput.value = input.value.trim();
-      openAssistantPanel();
+      openAssistantPanel('say');
     }
 
     function getReadableChatMessages() {
@@ -795,16 +937,48 @@
       hideShade();
     });
 
-    function openAssistantPanel() {
+    function showAssistantPane(pane) {
+      const isEdit = pane === 'edit';
+      document.getElementById('sayPane').style.display = isEdit ? 'none' : '';
+      document.getElementById('editPane').style.display = isEdit ? '' : 'none';
+      document.getElementById('sayTab').classList.toggle('active', !isEdit);
+      document.getElementById('editTab').classList.toggle('active', isEdit);
+      if (isEdit) {
+        document.getElementById('editResults').innerHTML = '';
+        document.getElementById('riskWarn').classList.remove('show');
+      }
+    }
+
+    function selectAssistantPane(pane = 'say', event = null, silent = false) {
+      const featureKey = pane === 'edit' ? 'rewrite' : 'say';
+      if (!isFeatureEnabled(featureKey)) {
+        if (!silent) showFeatureDisabled(featureKey, event, () => selectAssistantPane(pane));
+        const fallback = pane === 'edit' && isFeatureEnabled('say') ? 'say' : pane === 'say' && isFeatureEnabled('rewrite') ? 'edit' : '';
+        if (fallback) return selectAssistantPane(fallback, null, true);
+        showAssistantPane(pane);
+        renderEnableNotice(pane === 'edit' ? 'editResults' : 'sayResults', featureKey, () => selectAssistantPane(pane));
+        return false;
+      }
+      showAssistantPane(pane);
+      return true;
+    }
+
+    function openAssistantPanel(preferredPane = 'say', event = null) {
+      if (preferredPane && typeof preferredPane === 'object') {
+        event = preferredPane;
+        preferredPane = 'say';
+      }
       closePlusDrawer();
       document.getElementById('editResults').innerHTML = '';
       document.getElementById('riskWarn').classList.remove('show');
       document.getElementById('assistant').classList.add('show');
+      selectAssistantPane(preferredPane, event, true);
+      syncFeatureAvailability();
       showShade();
     }
 
-    bindAssistantEntry(document.getElementById('openAssistant'), openAssistantPanel);
-    bindAssistantEntry(document.getElementById('assistantFloat'), openAssistantPanel);
+    bindAssistantEntry(document.getElementById('openAssistant'), (event) => openAssistantPanel('say', event));
+    bindAssistantEntry(document.getElementById('assistantFloat'), (event) => openAssistantPanel('say', event));
 
     document.getElementById('aiMenuFloat').addEventListener('click', () => {
       setAssistantFloating(!aiSettings.floating);
@@ -828,13 +1002,14 @@
     document.getElementById('aiPreviewPlus').addEventListener('click', () => switchView('chat'));
     document.getElementById('startAiExperience').addEventListener('click', () => {
       switchView('chat');
-      openAssistantPanel();
+      openAssistantPanel('say');
     });
     document.getElementById('tryRiskFeature').addEventListener('click', () => {
       document.getElementById('featurePreviewInput').value = '你到底什么时候交作业？';
       document.getElementById('featurePreviewStatus').textContent = aiSettings.features.risk ? '已识别：这句话可能偏冲，建议点「会说」改得更稳。' : '语气风险提醒当前关闭，可以先打开再体验。';
     });
     document.getElementById('saveFeatureSettings').addEventListener('click', () => {
+      persistAiSettings();
       document.getElementById('featureSaveState').textContent = `已保存：${getEnabledFeatureCount()} 个功能开启。`;
       renderAiDetail();
     });
@@ -849,30 +1024,23 @@
     document.getElementById('savePersonaSettings').addEventListener('click', () => {
       const persona = currentPersona();
       const scopes = aiScopeMeta.filter(([key]) => aiSettings.scopes.includes(key)).map(([, title]) => title).join('、');
+      persistAiSettings();
       document.getElementById('personaSaveState').textContent = `已保存：${persona[1]}，应用于${scopes}。`;
       renderAiDetail();
     });
     renderAiDetail();
+    document.querySelectorAll('[data-feature-context-toggle]').forEach(button => {
+      button.addEventListener('click', () => toggleFeatureFromContext(button.dataset.featureContextToggle));
+    });
+    syncFeatureAvailability();
 
     shade.addEventListener('click', closeAllFloating);
     document.querySelectorAll('.close').forEach(btn => {
       btn.addEventListener('click', () => closeAllFloating());
     });
 
-    document.getElementById('sayTab').addEventListener('click', () => {
-      document.getElementById('sayPane').style.display = '';
-      document.getElementById('editPane').style.display = 'none';
-      document.getElementById('sayTab').classList.add('active');
-      document.getElementById('editTab').classList.remove('active');
-    });
-    document.getElementById('editTab').addEventListener('click', () => {
-      document.getElementById('sayPane').style.display = 'none';
-      document.getElementById('editPane').style.display = '';
-      document.getElementById('editTab').classList.add('active');
-      document.getElementById('sayTab').classList.remove('active');
-      document.getElementById('editResults').innerHTML = '';
-      document.getElementById('riskWarn').classList.remove('show');
-    });
+    document.getElementById('sayTab').addEventListener('click', (event) => selectAssistantPane('say', event));
+    document.getElementById('editTab').addEventListener('click', (event) => selectAssistantPane('edit', event));
 
     document.querySelectorAll('.chips').forEach(group => {
       group.addEventListener('click', (e) => {
@@ -888,6 +1056,7 @@
     }
 
     document.getElementById('voiceSay').addEventListener('click', () => {
+      if (!ensureFeature('say')) return;
       startSpeechToText({
         buttonId: 'voiceSay',
         inputId: 'voiceIntent',
@@ -897,6 +1066,7 @@
       });
     });
     document.getElementById('voiceEdit').addEventListener('click', () => {
+      if (!ensureFeature('rewrite')) return;
       startSpeechToText({
         buttonId: 'voiceEdit',
         inputId: 'editText',
@@ -906,6 +1076,7 @@
       });
     });
     document.getElementById('voiceSpace').addEventListener('click', () => {
+      if (!ensureFeature('polish')) return;
       startSpeechToText({
         buttonId: 'voiceSpace',
         inputId: 'spaceVoiceIntent',
@@ -915,6 +1086,7 @@
       });
     });
     document.getElementById('voiceReply').addEventListener('click', () => {
+      if (!ensureFeature('reply')) return;
       startSpeechToText({
         buttonId: 'voiceReply',
         inputId: 'replyNeed',
@@ -924,15 +1096,19 @@
       });
     });
     document.getElementById('parseVoice').addEventListener('click', () => {
+      if (!ensureFeature('say')) return;
       parseVoiceIntent(document.getElementById('voiceIntent').value.trim());
     });
     document.getElementById('parseEditVoice').addEventListener('click', () => {
+      if (!ensureFeature('rewrite')) return;
       parseEditVoice(document.getElementById('editVoiceIntent').value.trim());
     });
     document.getElementById('parseSpaceVoice').addEventListener('click', () => {
+      if (!ensureFeature('polish')) return;
       parseSpaceVoice(document.getElementById('spaceVoiceIntent').value.trim());
     });
     document.getElementById('parseReplyVoice').addEventListener('click', () => {
+      if (!ensureFeature('reply')) return;
       parseReplyVoice(document.getElementById('replyVoiceIntent').value.trim());
     });
     document.getElementById('generateSay').addEventListener('click', async () => {
@@ -942,12 +1118,34 @@
       await renderSaySuggestions(true);
     });
     document.getElementById('styleSay').addEventListener('click', async () => {
+      if (!ensureFeature('say')) {
+        renderEnableNotice('sayResults', 'say', () => document.getElementById('styleSay').click());
+        return;
+      }
+      if (!ensureFeature('likeMe')) {
+        renderEnableNotice('sayResults', 'likeMe', () => document.getElementById('styleSay').click());
+        return;
+      }
       sayLikeMe = true;
       document.getElementById('styleNoteSay').style.display = 'block';
       await renderSaySuggestions(false);
     });
 
     async function renderSaySuggestions(nextBatch) {
+      if (!ensureFeature('say')) {
+        renderEnableNotice('sayResults', 'say', () => renderSaySuggestions(nextBatch));
+        return;
+      }
+      if (sayLikeMe && !isFeatureEnabled('likeMe')) {
+        sayLikeMe = false;
+        document.getElementById('styleNoteSay').style.display = 'none';
+        renderEnableNotice('sayResults', 'likeMe', () => {
+          sayLikeMe = true;
+          document.getElementById('styleNoteSay').style.display = 'block';
+          renderSaySuggestions(nextBatch);
+        });
+        return;
+      }
       sayBatch = nextBatch ? sayBatch + 1 : 0;
       setSayLoading(true, nextBatch);
       renderResultNotice('sayResults', '正在调用 DeepSeek 生成表达建议...');
@@ -969,6 +1167,7 @@
       } finally {
         document.getElementById('rerollSay').style.display = 'inline-flex';
         setSayLoading(false, nextBatch);
+        syncFeatureAvailability();
       }
     }
 
@@ -1268,19 +1467,43 @@
       await renderEdit();
     });
     document.getElementById('styleEdit').addEventListener('click', async () => {
+      if (!ensureFeature('rewrite')) {
+        renderEnableNotice('editResults', 'rewrite', () => document.getElementById('styleEdit').click());
+        return;
+      }
+      if (!ensureFeature('likeMe')) {
+        renderEnableNotice('editResults', 'likeMe', () => document.getElementById('styleEdit').click());
+        return;
+      }
       editLikeMe = true;
       document.getElementById('styleNoteEdit').style.display = 'block';
       await renderEdit();
     });
 
     async function renderEdit() {
+      if (!ensureFeature('rewrite')) {
+        renderEnableNotice('editResults', 'rewrite', renderEdit);
+        document.getElementById('riskWarn').classList.remove('show');
+        return;
+      }
+      if (editLikeMe && !isFeatureEnabled('likeMe')) {
+        editLikeMe = false;
+        document.getElementById('styleNoteEdit').style.display = 'none';
+        renderEnableNotice('editResults', 'likeMe', () => {
+          editLikeMe = true;
+          document.getElementById('styleNoteEdit').style.display = 'block';
+          renderEdit();
+        });
+        document.getElementById('riskWarn').classList.remove('show');
+        return;
+      }
       const text = document.getElementById('editText').value.trim();
       if (!text) {
         document.getElementById('riskWarn').classList.remove('show');
         document.getElementById('editResults').innerHTML = '<div class="warn show">先输入一句想修改的话，或者用上面的语音入口填入。</div>';
         return;
       }
-      const risky = /到底|怎么还|为什么不|赶紧|快点/.test(text);
+      const risky = isFeatureEnabled('risk') && /到底|怎么还|为什么不|赶紧|快点/.test(text);
       document.getElementById('riskWarn').classList.toggle('show', risky);
       setEditLoading(true);
       renderResultNotice('editResults', '正在调用 DeepSeek 修改表达...');
@@ -1298,6 +1521,7 @@
         renderResults(document.getElementById('editResults'), generateEdit(text, risky), 'chat', { append: true });
       } finally {
         setEditLoading(false);
+        syncFeatureAvailability();
       }
     }
 
@@ -1330,9 +1554,9 @@
         ['quote', '“', '引用'],
         ['translate', '中A', '翻译'],
         ['remind', '●', '提醒'],
-        ['screenshot', '⌗', '截图'],
-        ['editOwn', 'AI', '帮我改']
+        ['screenshot', '⌗', '截图']
       ];
+      ownActions.push(isFeatureEnabled('rewrite') ? ['editOwn', 'AI', '帮我改'] : ['enableEditOwn', 'AI', '开启帮我改', 'ai-off']);
       const otherActions = [
         ['copy', '▣', '复制'],
         ['forward', '↗', '转发'],
@@ -1341,12 +1565,12 @@
         ['quote', '“', '引用'],
         ['translate', '中A', '翻译'],
         ['remind', '●', '提醒'],
-        ['screenshot', '⌗', '截图'],
-        ['helpReply', 'AI', '帮我回']
+        ['screenshot', '⌗', '截图']
       ];
+      otherActions.push(isFeatureEnabled('reply') ? ['helpReply', 'AI', '帮我回'] : ['enableHelpReply', 'AI', '开启帮我回', 'ai-off']);
       const actions = msg.me ? ownActions : otherActions;
-      document.getElementById('ctxMenu').innerHTML = actions.map(([action, icon, label]) => `
-        <button data-action="${action}" class="${action === 'helpReply' || action === 'editOwn' ? 'ai-menu' : ''}">
+      document.getElementById('ctxMenu').innerHTML = actions.map(([action, icon, label, extraClass = '']) => `
+        <button data-action="${action}" class="${action === 'helpReply' || action === 'editOwn' || action === 'enableHelpReply' || action === 'enableEditOwn' ? 'ai-menu' : ''} ${extraClass}">
           <i>${icon}</i><span>${label}</span>
         </button>
       `).join('');
@@ -1396,6 +1620,7 @@
     }
 
     function openReplyModalFromContext() {
+      if (!ensureFeature('reply')) return;
       document.getElementById('ctxMenu').classList.remove('show');
       document.getElementById('quotedMsg').textContent = selectedOriginalMsg;
       document.getElementById('replyResults').innerHTML = '';
@@ -1406,12 +1631,9 @@
     }
 
     function openEditOwnMessage() {
+      if (!ensureFeature('rewrite')) return;
       document.getElementById('ctxMenu').classList.remove('show');
-      openAssistantPanel();
-      document.getElementById('sayPane').style.display = 'none';
-      document.getElementById('editPane').style.display = '';
-      document.getElementById('sayTab').classList.remove('active');
-      document.getElementById('editTab').classList.add('active');
+      openAssistantPanel('edit');
       document.getElementById('editText').value = selectedOriginalMsg;
       document.getElementById('editResults').innerHTML = '';
     }
@@ -1431,6 +1653,8 @@
       const action = button.dataset.action;
       if (action === 'helpReply') openReplyModalFromContext();
       else if (action === 'editOwn') openEditOwnMessage();
+      else if (action === 'enableHelpReply') enableFeatureFromContext('reply', openReplyModalFromContext);
+      else if (action === 'enableEditOwn') enableFeatureFromContext('rewrite', openEditOwnMessage);
       else if (action === 'recall') recallSelectedMessage();
       else if (action === 'copy') copySelectedMessage();
       else {
@@ -1440,6 +1664,10 @@
     });
 
     replyGenerateButton.addEventListener('click', async () => {
+      if (!ensureFeature('reply')) {
+        renderEnableNotice('replyResults', 'reply', () => replyGenerateButton.click());
+        return;
+      }
       const tone = activeTexts('replyToneChips');
       const toneText = tone.join('、');
       const need = document.getElementById('replyNeed').value.trim();
@@ -1459,6 +1687,7 @@
         renderResults(document.getElementById('replyResults'), generateReplyFallback(selectedOriginalMsg, toneText, need), 'chat', { append: true });
       } finally {
         setReplyLoading(false);
+        syncFeatureAvailability();
       }
     });
 
@@ -1506,7 +1735,8 @@
       if (document.activeElement !== preview) preview.value = draft;
     }
 
-    function openSpacePolishPanel() {
+    function openSpacePolishPanel(event = null) {
+      if (!ensureFeature('polish', event, () => openSpacePolishPanel(event))) return;
       document.getElementById('spaceResults').innerHTML = '';
       const draft = document.getElementById('spaceText').value.trim();
       document.getElementById('spaceVoiceIntent').value = draft;
@@ -1516,7 +1746,6 @@
     }
 
     document.getElementById('openPolish').addEventListener('click', openSpacePolishPanel);
-    document.getElementById('inlinePolish').addEventListener('click', openSpacePolishPanel);
     document.getElementById('spaceDraftPreview').addEventListener('input', (event) => {
       const draft = event.target.value;
       document.getElementById('spaceVoiceIntent').value = draft;
@@ -1524,6 +1753,14 @@
     });
 
     document.getElementById('spaceLikeMe').addEventListener('click', async () => {
+      if (!ensureFeature('polish')) {
+        renderEnableNotice('spaceResults', 'polish', () => document.getElementById('spaceLikeMe').click());
+        return;
+      }
+      if (!ensureFeature('likeMe')) {
+        renderEnableNotice('spaceResults', 'likeMe', () => document.getElementById('spaceLikeMe').click());
+        return;
+      }
       spaceLikeMe = true;
       document.getElementById('spaceStyleNote').style.display = 'block';
       await renderSpaceSuggestions();
@@ -1534,6 +1771,20 @@
     });
 
     async function renderSpaceSuggestions() {
+      if (!ensureFeature('polish')) {
+        renderEnableNotice('spaceResults', 'polish', renderSpaceSuggestions);
+        return;
+      }
+      if (spaceLikeMe && !isFeatureEnabled('likeMe')) {
+        spaceLikeMe = false;
+        document.getElementById('spaceStyleNote').style.display = 'none';
+        renderEnableNotice('spaceResults', 'likeMe', () => {
+          spaceLikeMe = true;
+          document.getElementById('spaceStyleNote').style.display = 'block';
+          renderSpaceSuggestions();
+        });
+        return;
+      }
       const draft = getSpaceDraft();
       document.getElementById('spaceText').value = draft;
       document.getElementById('spaceVoiceIntent').value = draft;
@@ -1553,6 +1804,7 @@
         renderResults(document.getElementById('spaceResults'), generateSpaceCopy(), 'space', { append: true });
       } finally {
         setSpaceLoading(false);
+        syncFeatureAvailability();
       }
     }
 
