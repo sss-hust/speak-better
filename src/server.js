@@ -82,6 +82,7 @@ async function handleReplySuggestions(req, res) {
     const personaLabel = String(body.personaLabel || '').trim();
     const personaDesc = String(body.personaDesc || '').trim();
     const readSummary = String(body.readSummary || '').trim();
+    const rerollIndex = Number.isFinite(Number(body.rerollIndex)) ? Number(body.rerollIndex) : 0;
 
     if (!original) {
       sendJson(res, 400, { error: '缺少原消息内容。' });
@@ -98,7 +99,8 @@ async function handleReplySuggestions(req, res) {
       personaKey,
       personaLabel,
       personaDesc,
-      readSummary
+      readSummary,
+      rerollIndex
     });
     sendJson(res, 200, result);
   } catch (error) {

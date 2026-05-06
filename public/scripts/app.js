@@ -10,15 +10,21 @@
     const sayRerollButton = document.getElementById('rerollSay');
     const editGenerateButton = document.getElementById('generateEdit');
     const editStyleButton = document.getElementById('styleEdit');
+    const editRerollButton = document.getElementById('rerollEdit');
     const spaceGenerateButton = document.getElementById('generateSpace');
     const spaceLikeMeButton = document.getElementById('spaceLikeMe');
+    const spaceRerollButton = document.getElementById('rerollSpace');
     const replyGenerateButton = document.getElementById('generateReply');
+    const replyRerollButton = document.getElementById('rerollReply');
     let selectedOriginalMsg = '';
     let selectedReplySource = null;
     let sayLikeMe = false;
     let editLikeMe = false;
     let spaceLikeMe = false;
     let sayBatch = 0;
+    let editBatch = 0;
+    let replyBatch = 0;
+    let spaceBatch = 0;
     let sayToneTouched = false;
     let sayLengthTouched = false;
     let editStyleTouched = false;
@@ -611,11 +617,14 @@
       setFeatureAvailability('voiceEdit', isFeatureEnabled('rewrite'));
       setFeatureAvailability('parseEditVoice', isFeatureEnabled('rewrite'));
       setFeatureAvailability('styleEdit', isFeatureEnabled('rewrite') && isFeatureEnabled('likeMe'));
+      setFeatureAvailability('rerollEdit', isFeatureEnabled('rewrite'));
       setFeatureAvailability('generateReply', isFeatureEnabled('reply'));
+      setFeatureAvailability('rerollReply', isFeatureEnabled('reply'));
       setFeatureAvailability('voiceReply', isFeatureEnabled('reply'));
       setFeatureAvailability('parseReplyVoice', isFeatureEnabled('reply'));
       setFeatureAvailability('openPolish', isFeatureEnabled('polish'));
       setFeatureAvailability('generateSpace', isFeatureEnabled('polish'));
+      setFeatureAvailability('rerollSpace', isFeatureEnabled('polish'));
       setFeatureAvailability('voiceSpace', isFeatureEnabled('polish'));
       setFeatureAvailability('parseSpaceVoice', isFeatureEnabled('polish'));
       setFeatureAvailability('spaceLikeMe', isFeatureEnabled('polish') && isFeatureEnabled('likeMe'));
@@ -1150,9 +1159,9 @@
         : 'api/assist-generate';
     }
 
-    function setReplyLoading(loading) {
-      replyGenerateButton.disabled = loading;
-      replyGenerateButton.textContent = loading ? '生成中...' : '生成回复建议';
+    function setReplyLoading(loading, reroll = false) {
+      setButtonLoading(replyGenerateButton, loading, reroll ? '换一批中...' : '生成中...');
+      setButtonLoading(replyRerollButton, loading, '换一批中...');
     }
 
     function setButtonLoading(button, loading, loadingText) {
@@ -1168,13 +1177,15 @@
       sayStyleButton.disabled = loading;
     }
 
-    function setEditLoading(loading) {
-      setButtonLoading(editGenerateButton, loading, '修改中...');
+    function setEditLoading(loading, reroll = false) {
+      setButtonLoading(editGenerateButton, loading, reroll ? '换一批中...' : '修改中...');
+      setButtonLoading(editRerollButton, loading, '换一批中...');
       editStyleButton.disabled = loading;
     }
 
-    function setSpaceLoading(loading) {
-      setButtonLoading(spaceGenerateButton, loading, '生成中...');
+    function setSpaceLoading(loading, reroll = false) {
+      setButtonLoading(spaceGenerateButton, loading, reroll ? '换一批中...' : '生成中...');
+      setButtonLoading(spaceRerollButton, loading, '换一批中...');
       spaceLikeMeButton.disabled = loading;
     }
 
@@ -1186,7 +1197,7 @@
       document.getElementById(containerId).innerHTML = `<div class="warn show">${escapeHtml(message)}</div>`;
     }
 
-    async function requestReplySuggestions(original, tone, need) {
+    async function requestReplySuggestions(original, tone, need, rerollIndex = 0) {
       const extraContext = getReplyRequestContext();
       const response = await fetch(getReplyApiUrl(), {
         method: 'POST',
@@ -1195,6 +1206,7 @@
           original,
           tone,
           need,
+          rerollIndex,
           conversation: getReplyContextMessages(),
           ...extraContext
         })
@@ -1400,6 +1412,8 @@
         syncEditDraftFromChatInput();
         document.getElementById('editResults').innerHTML = '';
         document.getElementById('riskWarn').classList.remove('show');
+        editBatch = 0;
+        document.getElementById('rerollEdit').style.display = 'none';
       }
     }
 
@@ -1415,6 +1429,8 @@
         editText.value = source;
         document.getElementById('editResults').innerHTML = '';
         document.getElementById('riskWarn').classList.remove('show');
+        editBatch = 0;
+        document.getElementById('rerollEdit').style.display = 'none';
       }
       editText.dataset.syncedFromChat = 'true';
       return true;
@@ -1439,6 +1455,9 @@
       sayLikeMe = false;
       editLikeMe = false;
       sayBatch = 0;
+      editBatch = 0;
+      replyBatch = 0;
+      spaceBatch = 0;
       sayToneTouched = false;
       sayLengthTouched = false;
       editStyleTouched = false;
@@ -1460,8 +1479,10 @@
       if (editText) editText.dataset.syncedFromChat = '';
       const riskWarn = document.getElementById('riskWarn');
       if (riskWarn) riskWarn.classList.remove('show');
-      const reroll = document.getElementById('rerollSay');
-      if (reroll) reroll.style.display = 'none';
+      ['rerollSay', 'rerollEdit', 'rerollReply', 'rerollSpace'].forEach(id => {
+        const reroll = document.getElementById(id);
+        if (reroll) reroll.style.display = 'none';
+      });
       const styleNoteSay = document.getElementById('styleNoteSay');
       if (styleNoteSay) styleNoteSay.style.display = 'none';
       const styleNoteEdit = document.getElementById('styleNoteEdit');
@@ -2140,12 +2161,21 @@
       ]);
     }
 
-    function pickBatch(banks) {
-      return banks[sayBatch % banks.length];
+    function pickBatch(banks, index = sayBatch) {
+      return banks[index % banks.length];
+    }
+
+    function rotateItems(items, index = 0) {
+      if (!Array.isArray(items) || items.length < 2) return items;
+      const offset = index % items.length;
+      return items.slice(offset).concat(items.slice(0, offset));
     }
 
     document.getElementById('generateEdit').addEventListener('click', async () => {
-      await renderEdit();
+      await renderEdit(false);
+    });
+    document.getElementById('rerollEdit').addEventListener('click', async () => {
+      await renderEdit(true);
     });
     document.getElementById('styleEdit').addEventListener('click', async () => {
       if (!ensureFeature('rewrite')) {
@@ -2161,7 +2191,7 @@
       await renderEdit();
     });
 
-    async function renderEdit() {
+    async function renderEdit(nextBatch = false) {
       if (!ensureFeature('rewrite')) {
         renderEnableNotice('editResults', 'rewrite', renderEdit);
         document.getElementById('riskWarn').classList.remove('show');
@@ -2186,8 +2216,9 @@
       }
       const risky = isFeatureEnabled('risk') && /到底|怎么还|为什么不|赶紧|快点/.test(text);
       document.getElementById('riskWarn').classList.toggle('show', risky);
-      setEditLoading(true);
-      renderResultNotice('editResults', '正在调用 DeepSeek 修改表达...');
+      editBatch = nextBatch ? editBatch + 1 : 0;
+      setEditLoading(true, nextBatch);
+      renderResultNotice('editResults', nextBatch ? '正在换一批修改建议...' : '正在调用 DeepSeek 修改表达...');
       try {
         const manualStyles = selectedEditStyles();
         const items = await requestAssistItems('edit', {
@@ -2196,48 +2227,50 @@
           userStyleOverride: manualStyles.length > 0,
           likeMe: editLikeMe,
           risky,
+          rerollIndex: editBatch,
           ...getAiGenerationContext()
         });
         renderResults(document.getElementById('editResults'), items, 'chat');
         incrementAssistCount();
       } catch (error) {
         renderResultNotice('editResults', `调用真实接口失败：${error.message}。下面先给你本地兜底建议。`);
-        renderResults(document.getElementById('editResults'), generateEdit(text, risky), 'chat', { append: true });
+        renderResults(document.getElementById('editResults'), generateEdit(text, risky, editBatch), 'chat', { append: true });
         incrementAssistCount();
       } finally {
-        setEditLoading(false);
+        document.getElementById('rerollEdit').style.display = 'inline-flex';
+        setEditLoading(false, nextBatch);
         syncFeatureAvailability();
       }
     }
 
-    function generateEdit(text, risky) {
+    function generateEdit(text, risky, batchIndex = editBatch) {
       const styles = withPersonaDefaults('edit', selectedEditStyles()).join('');
       const persona = currentPersona();
       const personaKey = persona ? persona[0] : '';
       if (/真诚/.test(styles)) {
-        return ['我想真诚一点表达：' + text.replace(/[？！!]+/g, '。'), '这件事我确实挺在意的，所以想认真说清楚：' + text.replace(/[？！!]+/g, '。'), '我不是想指责，只是想把真实想法说出来：' + text.replace(/[？！!]+/g, '。')];
+        return rotateItems(['我想真诚一点表达：' + text.replace(/[？！!]+/g, '。'), '这件事我确实挺在意的，所以想认真说清楚：' + text.replace(/[？！!]+/g, '。'), '我不是想指责，只是想把真实想法说出来：' + text.replace(/[？！!]+/g, '。')], batchIndex);
       }
       if (/作业|交|进度|DDL/.test(text) || risky) {
         if (!editLikeMe && personaKey === 'meme') {
-          return ['DDL 有点近了🥲 你今晚方便先发个初版吗？我这边先合进去。', '我准备开始整合啦，你那部分今晚能先救一下吗？', '我们先把进度从危险区拖回来，你今晚先给我一版可以吗？'];
+          return rotateItems(['DDL 有点近了🥲 你今晚方便先发个初版吗？我这边先合进去。', '我准备开始整合啦，你那部分今晚能先救一下吗？', '我们先把进度从危险区拖回来，你今晚先给我一版可以吗？'], batchIndex);
         }
         if (!editLikeMe && personaKey === 'cool') {
-          return ['你那部分今晚能发我吗？', '我开始整合了，麻烦今晚给我一版。', 'DDL 比较近，你今晚先发我。'];
+          return rotateItems(['你那部分今晚能发我吗？', '我开始整合了，麻烦今晚给我一版。', 'DDL 比较近，你今晚先发我。'], batchIndex);
         }
         if (!editLikeMe && personaKey === 'eq') {
-          return ['我这边准备开始整合，想确认一下你负责的部分今晚方便先发我吗？', '为了预留后续整合时间，麻烦你今晚先发我一个初版。', '我会先合整体版本，你那部分如果今晚能发我会更好推进。'];
+          return rotateItems(['我这边准备开始整合，想确认一下你负责的部分今晚方便先发我吗？', '为了预留后续整合时间，麻烦你今晚先发我一个初版。', '我会先合整体版本，你那部分如果今晚能发我会更好推进。'], batchIndex);
         }
-        return editLikeMe
+        return rotateItems(editLikeMe
           ? ['我准备开始整合啦，你那部分大概什么时候能发我呀~', 'DDL 有点近了🥲 你方便今晚先发个初版吗？', '救命，我们不能被 DDL 带走哈哈，你那部分今晚能先给我吗？']
-          : ['我准备开始整合啦，你那部分大概什么时候能发我？', 'DDL 有点近了，你方便今晚先发一个初版吗？我这边好先合进去。', '我这边需要预留整合时间，所以想确认一下你那部分今天能不能发我。'];
+          : ['我准备开始整合啦，你那部分大概什么时候能发我？', 'DDL 有点近了，你方便今晚先发一个初版吗？我这边好先合进去。', '我这边需要预留整合时间，所以想确认一下你那部分今天能不能发我。'], batchIndex);
       }
       if (/不去|不想|拒绝/.test(text)) {
-        return ['谢谢你邀请我，不过我这次可能不太方便参加。', '我这边安排有点冲突，这次可能去不了啦。', '这次我先不参加了，你们玩得开心一点。'];
+        return rotateItems(['谢谢你邀请我，不过我这次可能不太方便参加。', '我这边安排有点冲突，这次可能去不了啦。', '这次我先不参加了，你们玩得开心一点。'], batchIndex);
       }
-      if (personaKey === 'meme') return ['我帮你把这句话改得更自然一点，但保留一点活人感：' + text, '这句可以稍微松一点说：' + text.replace(/[？！!]+/g, '。'), '换成不那么客服的版本：' + text.replace(/[？！!]+/g, '。')];
-      if (personaKey === 'cool') return [text.replace(/[？！!]+/g, '。'), '简短一点：' + text.replace(/[？！!]+/g, '。'), '可以直接说：' + text.replace(/[？！!]+/g, '。')];
-      if (personaKey === 'eq') return ['更得体一点可以说：' + text.replace(/[？！!]+/g, '。'), '我建议这样表达：' + text.replace(/[？！!]+/g, '。'), '如果想更清晰，可以说：' + text.replace(/[？！!]+/g, '。')];
-      return ['我帮你把这句话改得更自然一点：' + text, '更委婉一点可以说：' + text.replace(/！/g,'。'), '如果想更高情商一点，可以先说明原因，再表达自己的想法。'];
+      if (personaKey === 'meme') return rotateItems(['我帮你把这句话改得更自然一点，但保留一点活人感：' + text, '这句可以稍微松一点说：' + text.replace(/[？！!]+/g, '。'), '换成不那么客服的版本：' + text.replace(/[？！!]+/g, '。')], batchIndex);
+      if (personaKey === 'cool') return rotateItems([text.replace(/[？！!]+/g, '。'), '简短一点：' + text.replace(/[？！!]+/g, '。'), '可以直接说：' + text.replace(/[？！!]+/g, '。')], batchIndex);
+      if (personaKey === 'eq') return rotateItems(['更得体一点可以说：' + text.replace(/[？！!]+/g, '。'), '我建议这样表达：' + text.replace(/[？！!]+/g, '。'), '如果想更清晰，可以说：' + text.replace(/[？！!]+/g, '。')], batchIndex);
+      return rotateItems(['我帮你把这句话改得更自然一点：' + text, '更委婉一点可以说：' + text.replace(/！/g,'。'), '如果想更高情商一点，可以先说明原因，再表达自己的想法。'], batchIndex);
     }
 
     // =========================
@@ -2325,6 +2358,8 @@
       document.getElementById('replyResults').innerHTML = '';
       document.getElementById('replyVoiceIntent').value = '';
       document.getElementById('replyNeed').value = '';
+      replyBatch = 0;
+      document.getElementById('rerollReply').style.display = 'none';
       document.getElementById('replyModal').classList.add('show');
       showShade();
     }
@@ -2337,6 +2372,8 @@
       editText.value = selectedOriginalMsg;
       editText.dataset.syncedFromChat = 'false';
       document.getElementById('editResults').innerHTML = '';
+      editBatch = 0;
+      document.getElementById('rerollEdit').style.display = 'none';
     }
 
     document.addEventListener('click', (e) => {
@@ -2368,8 +2405,15 @@
     });
 
     replyGenerateButton.addEventListener('click', async () => {
+      await renderReplySuggestions(false);
+    });
+    replyRerollButton.addEventListener('click', async () => {
+      await renderReplySuggestions(true);
+    });
+
+    async function renderReplySuggestions(nextBatch = false) {
       if (!ensureFeature('reply')) {
-        renderEnableNotice('replyResults', 'reply', () => replyGenerateButton.click());
+        renderEnableNotice('replyResults', 'reply', () => renderReplySuggestions(nextBatch));
         return;
       }
       const tone = withPersonaDefaults('reply', selectedReplyTone());
@@ -2380,59 +2424,61 @@
         return;
       }
 
-      setReplyLoading(true);
-      renderReplyNotice('正在调用 DeepSeek 生成回复建议...');
+      replyBatch = nextBatch ? replyBatch + 1 : 0;
+      setReplyLoading(true, nextBatch);
+      renderReplyNotice(nextBatch ? '正在换一批回复建议...' : '正在调用 DeepSeek 生成回复建议...');
 
       try {
-        const replies = await requestReplySuggestions(selectedOriginalMsg, tone, need);
+        const replies = await requestReplySuggestions(selectedOriginalMsg, tone, need, replyBatch);
         renderResults(document.getElementById('replyResults'), replies, 'chat');
         incrementAssistCount();
       } catch (error) {
         renderReplyNotice(`调用真实接口失败：${error.message}。下面先给你本地兜底建议。`);
-        renderResults(document.getElementById('replyResults'), generateReplyFallback(selectedOriginalMsg, toneText, need), 'chat', { append: true });
+        renderResults(document.getElementById('replyResults'), generateReplyFallback(selectedOriginalMsg, toneText, need, replyBatch), 'chat', { append: true });
         incrementAssistCount();
       } finally {
-        setReplyLoading(false);
+        document.getElementById('rerollReply').style.display = 'inline-flex';
+        setReplyLoading(false, nextBatch);
         syncFeatureAvailability();
       }
-    });
+    }
 
-    function generateReplyFallback(original, tone, need = '') {
+    function generateReplyFallback(original, tone, need = '', batchIndex = replyBatch) {
       const combined = original + ' ' + need;
       const persona = currentPersona();
       const personaKey = persona ? persona[0] : '';
       if (/催|进度|作业|初版|DDL/i.test(combined)) {
         if (personaKey === 'meme' && !/友好|感谢|拒绝|高冷/.test(tone)) {
-          return ['可以可以，但 DDL 已经在门口探头了🥲 你今晚先发初版就行。', '行，先救一个初版也算功德无量，你大概几点能发我？', '没问题，我们先把它从危险区拖回来，你今晚先给我一版。'];
+          return rotateItems(['可以可以，但 DDL 已经在门口探头了🥲 你今晚先发初版就行。', '行，先救一个初版也算功德无量，你大概几点能发我？', '没问题，我们先把它从危险区拖回来，你今晚先给我一版。'], batchIndex);
         }
         if (personaKey === 'cool' && !/幽默|抽象|感谢/.test(tone)) {
-          return ['可以，今晚先发我一版。', '行，你大概几点给我？', '先给初版，我这边整合。'];
+          return rotateItems(['可以，今晚先发我一版。', '行，你大概几点给我？', '先给初版，我这边整合。'], batchIndex);
         }
         if (personaKey === 'eq' && !/幽默|抽象|高冷/.test(tone)) {
-          return ['可以的，那你今晚方便先发一个初版吗？我这边先合进去。', '没问题，你大概几点能发我？我好安排整合时间。', '可以，但我们时间有点紧，麻烦你尽量今晚发我一下。'];
+          return rotateItems(['可以的，那你今晚方便先发一个初版吗？我这边先合进去。', '没问题，你大概几点能发我？我好安排整合时间。', '可以，但我们时间有点紧，麻烦你尽量今晚发我一下。'], batchIndex);
         }
-        return tone.includes('幽默') || tone.includes('抽象')
+        return rotateItems(tone.includes('幽默') || tone.includes('抽象')
           ? ['可以可以，但 DDL 已经在门口探头了🥲 你今晚先发初版就行。', '行，先救一个初版也算功德无量，你大概几点能发我？', '没问题，我们先把它从危险区拖回来，你今晚先给我一版。']
-          : ['可以的，那你今晚方便先发一个初版吗？我这边先合进去。', '没问题，你大概几点能发我？我好安排整合时间。', '可以，但我们时间有点紧，麻烦你尽量今晚发我一下。'];
+          : ['可以的，那你今晚方便先发一个初版吗？我这边先合进去。', '没问题，你大概几点能发我？我好安排整合时间。', '可以，但我们时间有点紧，麻烦你尽量今晚发我一下。'], batchIndex);
       }
       if (/幽默|有梗/.test(need)) {
-        return ['收到，我先确认一下，争取不让事情变成连续剧。', '可以，我这边先看一下情况，有结果立刻汇报。', '明白，我去处理一下，尽量让它优雅落地。'];
+        return rotateItems(['收到，我先确认一下，争取不让事情变成连续剧。', '可以，我这边先看一下情况，有结果立刻汇报。', '明白，我去处理一下，尽量让它优雅落地。'], batchIndex);
       }
       if (/请假|报名表|老师|问题/.test(original)) {
-        return ['老师收到，我会尽快整理好发给您。', '老师您好，我这边确认一下信息，整理好后及时发您。', '好的老师，如果有不清楚的地方我会及时和您沟通。'];
+        return rotateItems(['老师收到，我会尽快整理好发给您。', '老师您好，我这边确认一下信息，整理好后及时发您。', '好的老师，如果有不清楚的地方我会及时和您沟通。'], batchIndex);
       }
       if (/付款码|钱|转账|收款/.test(original)) {
-        return ['收到，我确认一下金额后转你。', '好滴，我等下转过去，转完跟你说。', '可以，你把金额也发我一下，我一起核对。'];
+        return rotateItems(['收到，我确认一下金额后转你。', '好滴，我等下转过去，转完跟你说。', '可以，你把金额也发我一下，我一起核对。'], batchIndex);
       }
       if (/晚点|可以吗|还差/.test(original)) {
-        return tone.includes('幽默') || tone.includes('抽象')
+        return rotateItems(tone.includes('幽默') || tone.includes('抽象')
           ? ['可以，但 DDL 已经在门口敲门了🥲 你今晚先发初版就行。', '行，先救一个初版也算功德无量。', '可以可以，我们先把 PPT 从危险区拖回来。']
-          : ['可以的，那你今晚方便先发一个初版吗？我这边先合进去。', '没问题，你大概几点能发我？我好安排整合时间。', '可以，但我们时间有点紧，麻烦你尽量今晚发我一下。'];
+          : ['可以的，那你今晚方便先发一个初版吗？我这边先合进去。', '没问题，你大概几点能发我？我好安排整合时间。', '可以，但我们时间有点紧，麻烦你尽量今晚发我一下。'], batchIndex);
       }
       if (tone.includes('拒绝')) {
-        return ['谢谢你想到我，不过这次我可能不太方便。', '我理解你的意思，但这件事我这边暂时做不了。', '这次我可能没法答应，怕耽误你所以先说清楚。'];
+        return rotateItems(['谢谢你想到我，不过这次我可能不太方便。', '我理解你的意思，但这件事我这边暂时做不了。', '这次我可能没法答应，怕耽误你所以先说清楚。'], batchIndex);
       }
-      return ['收到，我看一下再回复你。', '可以的，我这边先确认一下。', '明白，我等下处理完跟你说。'];
+      return rotateItems(['收到，我看一下再回复你。', '可以的，我这边先确认一下。', '明白，我等下处理完跟你说。'], batchIndex);
     }
 
     // =========================
@@ -2458,6 +2504,8 @@
       const draft = document.getElementById('spaceText').value.trim();
       document.getElementById('spaceVoiceIntent').value = draft;
       document.getElementById('spaceDraftPreview').value = draft;
+      spaceBatch = 0;
+      document.getElementById('rerollSpace').style.display = 'none';
       document.getElementById('spacePanel').classList.add('show');
       showShade();
     }
@@ -2480,16 +2528,19 @@
       }
       spaceLikeMe = true;
       document.getElementById('spaceStyleNote').style.display = 'block';
-      await renderSpaceSuggestions();
+      await renderSpaceSuggestions(false);
     });
 
     document.getElementById('generateSpace').addEventListener('click', async () => {
-      await renderSpaceSuggestions();
+      await renderSpaceSuggestions(false);
+    });
+    document.getElementById('rerollSpace').addEventListener('click', async () => {
+      await renderSpaceSuggestions(true);
     });
 
-    async function renderSpaceSuggestions() {
+    async function renderSpaceSuggestions(nextBatch = false) {
       if (!ensureFeature('polish')) {
-        renderEnableNotice('spaceResults', 'polish', renderSpaceSuggestions);
+        renderEnableNotice('spaceResults', 'polish', () => renderSpaceSuggestions(nextBatch));
         return;
       }
       if (spaceLikeMe && !isFeatureEnabled('likeMe')) {
@@ -2506,8 +2557,9 @@
       document.getElementById('spaceText').value = draft;
       document.getElementById('spaceVoiceIntent').value = draft;
       updateSpaceDraftPreview();
-      setSpaceLoading(true);
-      renderResultNotice('spaceResults', '正在调用 DeepSeek 生成说说文案...');
+      spaceBatch = nextBatch ? spaceBatch + 1 : 0;
+      setSpaceLoading(true, nextBatch);
+      renderResultNotice('spaceResults', nextBatch ? '正在换一批说说文案...' : '正在调用 DeepSeek 生成说说文案...');
       try {
         const manualStyles = selectedSpaceStyles();
         const items = await requestAssistItems('space', {
@@ -2515,59 +2567,61 @@
           styles: withPersonaDefaults('space', manualStyles),
           userStyleOverride: manualStyles.length > 0,
           likeMe: spaceLikeMe,
+          rerollIndex: spaceBatch,
           ...getAiGenerationContext({ includeConversation: false })
         });
         renderResults(document.getElementById('spaceResults'), items, 'space');
         incrementAssistCount();
       } catch (error) {
         renderResultNotice('spaceResults', `调用真实接口失败：${error.message}。下面先给你本地兜底建议。`);
-        renderResults(document.getElementById('spaceResults'), generateSpaceCopy(), 'space', { append: true });
+        renderResults(document.getElementById('spaceResults'), generateSpaceCopy(spaceBatch), 'space', { append: true });
         incrementAssistCount();
       } finally {
-        setSpaceLoading(false);
+        document.getElementById('rerollSpace').style.display = 'inline-flex';
+        setSpaceLoading(false, nextBatch);
         syncFeatureAvailability();
       }
     }
 
-    function generateSpaceCopy() {
+    function generateSpaceCopy(batchIndex = spaceBatch) {
       const draft = getSpaceDraft();
       const manualStyles = selectedSpaceStyles();
       const styles = withPersonaDefaults('space', manualStyles).join('');
       const persona = currentPersona();
       const personaKey = persona ? persona[0] : '';
       if (spaceLikeMe) {
-        return ['本人已进入 PPT 淹没模式，勿扰，除非你会划重点🥲', '复习进度：打开了。精神状态：关闭了。', '不是我不想学，是这门课先对我动手的。'];
+        return rotateItems(['本人已进入 PPT 淹没模式，勿扰，除非你会划重点🥲', '复习进度：打开了。精神状态：关闭了。', '不是我不想学，是这门课先对我动手的。'], batchIndex);
       }
       if (personaKey === 'meme' && !manualStyles.length) {
-        return ['本人已进入 PPT 淹没模式，勿扰，除非你会划重点🥲', '复习进度：打开了。精神状态：关闭了。', '不是我不想学，是这门课先对我动手的。'];
+        return rotateItems(['本人已进入 PPT 淹没模式，勿扰，除非你会划重点🥲', '复习进度：打开了。精神状态：关闭了。', '不是我不想学，是这门课先对我动手的。'], batchIndex);
       }
       if (personaKey === 'cool' && !manualStyles.length) {
-        return ['今天就这样。', '累，但过了。', '存个档。'];
+        return rotateItems(['今天就这样。', '累，但过了。', '存个档。'], batchIndex);
       }
       if (personaKey === 'eq' && !manualStyles.length) {
-        return ['在混乱里慢慢往前挪，也算是一种认真。', '今天也在努力靠近那个“不慌”的自己。', '复习很累，但每看完一点都算数。'];
+        return rotateItems(['在混乱里慢慢往前挪，也算是一种认真。', '今天也在努力靠近那个“不慌”的自己。', '复习很累，但每看完一点都算数。'], batchIndex);
       }
       if (/文艺|伤感/.test(styles)) {
-        return ['今天的风有点轻，心事有点重，但还是想把这一刻留下来。', '有些日子不用很热闹，安静地经过也算一种纪念。', '把没说出口的情绪，暂时交给这条说说。'];
+        return rotateItems(['今天的风有点轻，心事有点重，但还是想把这一刻留下来。', '有些日子不用很热闹，安静地经过也算一种纪念。', '把没说出口的情绪，暂时交给这条说说。'], batchIndex);
       }
       if (/励志|元气/.test(styles)) {
-        return ['今天也在一点点往前走，慢一点也没关系。', '先把眼前这一小步做好，剩下的交给明天继续努力。', '累归累，但我还是想认真把生活过亮一点。'];
+        return rotateItems(['今天也在一点点往前走，慢一点也没关系。', '先把眼前这一小步做好，剩下的交给明天继续努力。', '累归累，但我还是想认真把生活过亮一点。'], batchIndex);
       }
       if (/碎碎念/.test(styles)) {
-        return ['今天也没发生什么大事，但就是想碎碎念一下。', '一些普通但真实的小日常，随手存个档。', '今天的状态：有点累，但还算可爱。'];
+        return rotateItems(['今天也没发生什么大事，但就是想碎碎念一下。', '一些普通但真实的小日常，随手存个档。', '今天的状态：有点累，但还算可爱。'], batchIndex);
       }
       if (/复习|期末|好累|PPT|学习/.test(draft) || /抽象|有梗/.test(styles)) {
-        return /高情商/.test(styles)
+        return rotateItems(/高情商/.test(styles)
           ? ['在混乱里慢慢往前挪，也算是一种认真。', '今天也在努力靠近那个“不慌”的自己。', '复习很累，但每看完一点都算数。']
-          : ['本人已进入 PPT 淹没模式，勿扰，除非你会划重点🥲', '复习进度：打开了。精神状态：关闭了。', '不是我不想学，是这门课先对我动手的。'];
+          : ['本人已进入 PPT 淹没模式，勿扰，除非你会划重点🥲', '复习进度：打开了。精神状态：关闭了。', '不是我不想学，是这门课先对我动手的。'], batchIndex);
       }
       if (/生日|纪念日/.test(draft)) {
-        return ['又认真生活了一年，继续保持可爱和清醒。', '今天值得被记住，也值得被好好庆祝。', '愿望不多，先祝自己一直有好运气。'];
+        return rotateItems(['又认真生活了一年，继续保持可爱和清醒。', '今天值得被记住，也值得被好好庆祝。', '愿望不多，先祝自己一直有好运气。'], batchIndex);
       }
       if (/旅游|美食|日常|照片/.test(draft)) {
-        return ['把今天存档，快乐有图有真相。', '普通日子里的小确幸，已成功捕获。', '今天的快乐浓度刚刚好。'];
+        return rotateItems(['把今天存档，快乐有图有真相。', '普通日子里的小确幸，已成功捕获。', '今天的快乐浓度刚刚好。'], batchIndex);
       }
-      return ['今天也算认真生活了一下。', '一些新鲜事，发出来证明我来过。', '把这一刻放进空间里，过几天再回来看看。'];
+      return rotateItems(['今天也算认真生活了一下。', '一些新鲜事，发出来证明我来过。', '把这一刻放进空间里，过几天再回来看看。'], batchIndex);
     }
 
     document.getElementById('publishBtn').addEventListener('click', () => {

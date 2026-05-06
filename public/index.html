@@ -549,8 +549,11 @@
               </div>
             </div>
           </details>
-          <button class="primary" id="generateEdit">修改</button>
-          <button class="ghost" id="styleEdit">🎭 像我说</button>
+          <div class="assistant-actions">
+            <button class="primary" id="generateEdit">修改</button>
+            <button class="ghost" id="styleEdit">🎭 像我说</button>
+            <button class="reroll" id="rerollEdit">不满意，换一批</button>
+          </div>
           <p id="styleNoteEdit" style="display:none;color:#667;font-size:12px;">已临时参考你最近消息风格：更短、更口语，会自然带一点“哈哈/🥲”。</p>
           <div class="warn" id="riskWarn">⚠️ 这句话可能让对方感觉被质问，已为您生成更温和的版本。</div>
           <div class="results" id="editResults"></div>
@@ -615,7 +618,10 @@
             </div>
           </div>
         </details>
-        <button class="primary" id="generateReply">生成回复建议</button>
+        <div class="assistant-actions">
+          <button class="primary" id="generateReply">生成回复建议</button>
+          <button class="reroll" id="rerollReply">不满意，换一批</button>
+        </div>
         <div class="results" id="replyResults"></div>
       </div>
     </section>
@@ -653,8 +659,11 @@
           <button class="chip">文艺伤感风</button>
           <button class="chip">励志元气风</button>
         </div>
-        <button class="primary" id="generateSpace">生成</button>
-        <button class="ghost" id="spaceLikeMe">更像我说</button>
+        <div class="assistant-actions">
+          <button class="primary" id="generateSpace">生成</button>
+          <button class="ghost" id="spaceLikeMe">更像我说</button>
+          <button class="reroll" id="rerollSpace">不满意，换一批</button>
+        </div>
         <p id="spaceStyleNote" style="display:none;color:#667;font-size:12px;">已参考历史说说风格：短句、轻微抽象、喜欢用“救命/本人/🥲”。</p>
         <div class="results" id="spaceResults"></div>
         <details class="optional-fields space-rewrite">
@@ -677,6 +686,6 @@
     </section>
   </main>
 
-    <script src="scripts/app.js?v=20260506-assistant-statefix"></script>
+    <script src="scripts/app.js?v=20260506-reroll-all"></script>
 </body>
 </html>

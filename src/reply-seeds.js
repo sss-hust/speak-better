@@ -105,7 +105,8 @@ function buildReplyBrief({
   personaKey = '',
   personaLabel = '',
   personaDesc = '',
-  readSummary = ''
+  readSummary = '',
+  rerollIndex = 0
 }) {
   const toneList = Array.isArray(tone)
     ? tone.map((item) => String(item).trim()).filter(Boolean)
@@ -131,6 +132,7 @@ function buildReplyBrief({
   return {
     original,
     need,
+    rerollIndex: Number.isFinite(Number(rerollIndex)) ? Number(rerollIndex) : 0,
     toneList,
     threadTitle,
     sourceName,
@@ -317,12 +319,18 @@ function getOutputAngles(sceneKey, personaKey) {
 function buildFallbackReplies(brief) {
   const sceneTemplates = getSceneTemplates(brief);
   const personaTemplates = sceneTemplates[brief.personaKey] || sceneTemplates.default || [];
-  const replies = finalizeReplies(personaTemplates, brief);
-  return replies.length ? replies : [
+  const replies = rotateReplyItems(finalizeReplies(personaTemplates, brief), brief.rerollIndex);
+  return replies.length ? replies : rotateReplyItems([
     '行，那你方便的时候把现在这版先发我，我这边接着往下弄。',
     '可以，我先接住这边，晚点你把版本丢我就行。',
     '好，那我们先把下一步定下来，你那边弄好就发我。'
-  ];
+  ], brief.rerollIndex);
+}
+
+function rotateReplyItems(items, index = 0) {
+  if (!Array.isArray(items) || items.length < 2) return items;
+  const offset = Math.abs(Number(index) || 0) % items.length;
+  return items.slice(offset).concat(items.slice(0, offset));
 }
 
 function getSceneTemplates(brief) {

@@ -112,6 +112,7 @@ function buildReplyMessages(brief) {
         brief.contextDigest,
         `对方刚发来的消息：${brief.original}`,
         `我额外补充的回复要求：${brief.need || '无'}`,
+        `本轮是第 ${brief.rerollIndex + 1} 次生成，如与之前相似请主动换表达方式。`,
         `必须避免的弱表达：${bannedText}`,
         `本次最好体现的关键词或动作：${mustMentionText}`,
         `单条建议长度：${brief.lengthHint}`,
