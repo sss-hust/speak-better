@@ -99,6 +99,7 @@
       clearChatVoiceStatus();
       closePlusDrawer();
       closeAllFloating();
+      resetAssistantSession();
     }
 
     function openChatThread(chatId) {
@@ -1090,6 +1091,7 @@
             document.getElementById('spaceText').value = finalText;
           } else {
             chatInput.value = finalText;
+            syncEditDraftFromChatInput({ force: true });
           }
           closeAllFloating();
         });
@@ -1334,9 +1336,14 @@
       chatInput.value = '';
       clearChatVoiceStatus();
       closeEmojiPanel();
+      closeAllFloating();
+      resetAssistantSession();
     });
     chatInput.addEventListener('input', () => {
       if (chatInput.value.trim()) clearChatVoiceStatus();
+      const assistantOpen = document.getElementById('assistant').classList.contains('show');
+      const editVisible = document.getElementById('editPane').style.display !== 'none';
+      if (assistantOpen && editVisible) syncEditDraftFromChatInput();
     });
     document.getElementById('chatVoice').addEventListener('click', () => {
       closePlusDrawer();
@@ -1390,9 +1397,80 @@
       document.getElementById('sayTab').classList.toggle('active', !isEdit);
       document.getElementById('editTab').classList.toggle('active', isEdit);
       if (isEdit) {
+        syncEditDraftFromChatInput();
         document.getElementById('editResults').innerHTML = '';
         document.getElementById('riskWarn').classList.remove('show');
       }
+    }
+
+    function syncEditDraftFromChatInput(options = {}) {
+      const { force = false } = options;
+      const source = chatInput.value.trim();
+      if (!source) return false;
+      const editText = document.getElementById('editText');
+      if (!editText) return false;
+      const canSync = force || !editText.value.trim() || editText.dataset.syncedFromChat === 'true';
+      if (!canSync) return false;
+      if (editText.value !== source) {
+        editText.value = source;
+        document.getElementById('editResults').innerHTML = '';
+        document.getElementById('riskWarn').classList.remove('show');
+      }
+      editText.dataset.syncedFromChat = 'true';
+      return true;
+    }
+
+    function clearTextValue(id) {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    }
+
+    function clearTextContent(id) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '';
+    }
+
+    function clearResults(id) {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '';
+    }
+
+    function resetAssistantSession() {
+      sayLikeMe = false;
+      editLikeMe = false;
+      sayBatch = 0;
+      sayToneTouched = false;
+      sayLengthTouched = false;
+      editStyleTouched = false;
+      replyToneTouched = false;
+      clearTextValue('voiceIntent');
+      clearTextValue('target');
+      clearTextValue('purpose');
+      clearTextValue('editText');
+      clearTextValue('editVoiceIntent');
+      clearTextValue('replyNeed');
+      clearTextValue('replyVoiceIntent');
+      clearTextContent('voiceStatus');
+      clearTextContent('voiceEditStatus');
+      clearTextContent('voiceReplyStatus');
+      clearResults('sayResults');
+      clearResults('editResults');
+      clearResults('replyResults');
+      const editText = document.getElementById('editText');
+      if (editText) editText.dataset.syncedFromChat = '';
+      const riskWarn = document.getElementById('riskWarn');
+      if (riskWarn) riskWarn.classList.remove('show');
+      const reroll = document.getElementById('rerollSay');
+      if (reroll) reroll.style.display = 'none';
+      const styleNoteSay = document.getElementById('styleNoteSay');
+      if (styleNoteSay) styleNoteSay.style.display = 'none';
+      const styleNoteEdit = document.getElementById('styleNoteEdit');
+      if (styleNoteEdit) styleNoteEdit.style.display = 'none';
+      setChipSelections('toneChips', []);
+      setChipSelections('lengthChips', []);
+      setChipSelections('editStyleChips', []);
+      setChipSelections('replyToneChips', []);
+      syncPersonaDefaultChipVisuals();
     }
 
     function selectAssistantPane(pane = 'say', event = null, silent = false) {
@@ -1536,6 +1614,9 @@
 
     document.getElementById('sayTab').addEventListener('click', (event) => selectAssistantPane('say', event));
     document.getElementById('editTab').addEventListener('click', (event) => selectAssistantPane('edit', event));
+    document.getElementById('editText').addEventListener('input', () => {
+      document.getElementById('editText').dataset.syncedFromChat = 'false';
+    });
 
     document.querySelectorAll('.chips').forEach(group => {
       group.addEventListener('click', (e) => {
@@ -1851,7 +1932,9 @@
       }
       const quoteMatch = text.match(/[“"']([^“”"']+)[”"']/);
       const raw = quoteMatch ? quoteMatch[1] : text.replace(/^(帮我|把|将|请把)/, '').replace(/(改得|改成|润色成|变得|语气).*$/, '').trim();
-      document.getElementById('editText').value = raw || text;
+      const editText = document.getElementById('editText');
+      editText.value = raw || text;
+      editText.dataset.syncedFromChat = 'false';
       setChipState('editStyleChips', [
         [/礼貌|客气/.test(text), '更礼貌'],
         [/委婉|温柔|别太硬|不像质问/.test(text), '更委婉'],
@@ -2250,7 +2333,9 @@
       if (!ensureFeature('rewrite')) return;
       document.getElementById('ctxMenu').classList.remove('show');
       openAssistantPanel('edit');
-      document.getElementById('editText').value = selectedOriginalMsg;
+      const editText = document.getElementById('editText');
+      editText.value = selectedOriginalMsg;
+      editText.dataset.syncedFromChat = 'false';
       document.getElementById('editResults').innerHTML = '';
     }
 
