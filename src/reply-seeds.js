@@ -83,6 +83,18 @@ const TONE_PRESETS = {
   }
 };
 
+const NEUTRAL_PERSONA = {
+  label: '未设置',
+  summary: '用户没有启用默认人格，只按当前场景、用户输入和手动选择的 tone chips 生成。',
+  directives: [
+    '不要擅自套用温和边界鹅或其他默认人格',
+    '优先满足当前场景目标和用户本轮输入',
+    '如果没有 tone chips，就保持自然、清楚、可直接发送'
+  ],
+  habitWords: ['我这边', '可以', '先'],
+  bannedPhrases: ['收到', '明白', '我先看看', '我先确认一下']
+};
+
 function buildReplyBrief({
   original,
   need = '',
@@ -90,7 +102,7 @@ function buildReplyBrief({
   conversation = [],
   threadTitle = '',
   sourceName = '',
-  personaKey = 'warm',
+  personaKey = '',
   personaLabel = '',
   personaDesc = '',
   readSummary = ''
@@ -99,11 +111,12 @@ function buildReplyBrief({
     ? tone.map((item) => String(item).trim()).filter(Boolean)
     : String(tone || '').split(/[、,\s]+/).map((item) => item.trim()).filter(Boolean);
   const combined = [threadTitle, sourceName, original, need, toneList.join(' ')].filter(Boolean).join(' ');
-  const persona = PERSONA_PRESETS[personaKey] || PERSONA_PRESETS.warm;
+  const normalizedPersonaKey = PERSONA_PRESETS[personaKey] ? personaKey : '';
+  const persona = normalizedPersonaKey ? PERSONA_PRESETS[normalizedPersonaKey] : NEUTRAL_PERSONA;
   const scene = inferScene({ combined, original, need, threadTitle, sourceName, toneList });
   const relationship = inferRelationship({ threadTitle, sourceName, combined });
   const contextDigest = buildContextDigest(conversation);
-  const readStyleText = readSummary || inferReadSummary(personaKey, relationship, threadTitle);
+  const readStyleText = readSummary || inferReadSummary(normalizedPersonaKey, relationship, threadTitle);
   const bannedPhrases = uniqueStrings([
     '收到',
     '明白',
@@ -121,7 +134,7 @@ function buildReplyBrief({
     toneList,
     threadTitle,
     sourceName,
-    personaKey,
+    personaKey: normalizedPersonaKey,
     personaLabel: personaLabel || persona.label,
     personaDesc: personaDesc || persona.summary,
     persona,
@@ -245,7 +258,10 @@ function buildContextDigest(conversation) {
 }
 
 function inferReadSummary(personaKey, relationship, threadTitle) {
-  const persona = PERSONA_PRESETS[personaKey] || PERSONA_PRESETS.warm;
+  if (!personaKey || !PERSONA_PRESETS[personaKey]) {
+    return `当前聊天是「${threadTitle || relationship}」，用户未设置默认人格，本次只按当前场景和手动选项生成。`;
+  }
+  const persona = PERSONA_PRESETS[personaKey];
   return `当前聊天是「${threadTitle || relationship}」，优先按「${persona.label}」执行：${persona.summary}`;
 }
 

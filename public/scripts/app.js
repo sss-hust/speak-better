@@ -19,11 +19,19 @@
     let editLikeMe = false;
     let spaceLikeMe = false;
     let sayBatch = 0;
+    let sayToneTouched = false;
+    let sayLengthTouched = false;
+    let editStyleTouched = false;
+    let replyToneTouched = false;
+    let spaceStyleTouched = false;
     let currentChatId = 'pcg';
-    let currentView = 'messages';
+    let currentView = 'intro';
     let appHistoryDepth = 0;
     let syncingBrowserHistory = false;
     let messageIdSeed = 0;
+    let personaSetupReturnContext = null;
+    let personaActionSource = null;
+    let gooseAudioContext = null;
 
     const sampleMessages = [
       { me:false, avatar:'', avatarClass:'avatar-a', name:'DING', time:'21:25', text:'搞成积分吧，使用功能扣积分（（' },
@@ -186,7 +194,9 @@
     const aiSettings = {
       floating: false,
       features: { say: true, rewrite: true, reply: true, polish: true, likeMe: false, risk: true },
-      persona: 'warm',
+      persona: '',
+      personaConfirmed: false,
+      personaPromptDismissed: false,
       scopes: ['private', 'group', 'qzone'],
       readTarget: 'current',
       hasReadStyle: false,
@@ -200,6 +210,8 @@
         if (saved.features) aiSettings.features = { ...aiSettings.features, ...saved.features };
         if (typeof saved.floating === 'boolean') aiSettings.floating = saved.floating;
         if (saved.persona) aiSettings.persona = saved.persona;
+        if (typeof saved.personaConfirmed === 'boolean') aiSettings.personaConfirmed = saved.personaConfirmed;
+        if (typeof saved.personaPromptDismissed === 'boolean') aiSettings.personaPromptDismissed = saved.personaPromptDismissed;
         if (Array.isArray(saved.scopes) && saved.scopes.length) aiSettings.scopes = saved.scopes;
         if (typeof saved.assistCount === 'number') aiSettings.assistCount = saved.assistCount;
       } catch (error) {
@@ -213,6 +225,8 @@
           floating: aiSettings.floating,
           features: aiSettings.features,
           persona: aiSettings.persona,
+          personaConfirmed: aiSettings.personaConfirmed,
+          personaPromptDismissed: aiSettings.personaPromptDismissed,
           scopes: aiSettings.scopes,
           assistCount: aiSettings.assistCount || 0
         }));
@@ -231,8 +245,98 @@
       return 'newbie';
     }
 
-    function tapGoose() {
+    function getGooseAudioContext() {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return null;
+      if (!gooseAudioContext) gooseAudioContext = new AudioContextClass();
+      return gooseAudioContext;
+    }
+
+    function playGooseSound(tier) {
+      const ctx = getGooseAudioContext();
+      if (!ctx) return;
+      const schedule = () => scheduleGooseChime(ctx, tier);
+      if (ctx.state === 'suspended') {
+        ctx.resume().then(schedule).catch(() => {});
+        return;
+      }
+      schedule();
+    }
+
+    function scheduleGooseChime(ctx, tier) {
+      const now = ctx.currentTime + 0.01;
+      const profile = {
+        newbie: { base: 784, volume: 0.34, decay: 0.95, sparkle: 0.55 },
+        familiar: { base: 880, volume: 0.38, decay: 1.08, sparkle: 0.72 },
+        veteran: { base: 988, volume: 0.42, decay: 1.25, sparkle: 0.9 }
+      }[tier] || { base: 820, volume: 0.34, decay: 1, sparkle: 0.6 };
+
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(0.0001, now);
+      master.gain.exponentialRampToValueAtTime(profile.volume, now + 0.012);
+      master.gain.exponentialRampToValueAtTime(0.0001, now + profile.decay + 0.28);
+      master.connect(ctx.destination);
+
+      const strikeBuffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.09), ctx.sampleRate);
+      const strikeData = strikeBuffer.getChannelData(0);
+      for (let i = 0; i < strikeData.length; i += 1) {
+        const fade = 1 - (i / strikeData.length);
+        strikeData[i] = (Math.random() * 2 - 1) * fade * fade;
+      }
+      const strike = ctx.createBufferSource();
+      strike.buffer = strikeBuffer;
+      const strikeFilter = ctx.createBiquadFilter();
+      strikeFilter.type = 'bandpass';
+      strikeFilter.frequency.setValueAtTime(1800 + profile.sparkle * 700, now);
+      strikeFilter.Q.setValueAtTime(1.2, now);
+      const strikeGain = ctx.createGain();
+      strikeGain.gain.setValueAtTime(0.2, now);
+      strikeGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+      strike.connect(strikeFilter);
+      strikeFilter.connect(strikeGain);
+      strikeGain.connect(master);
+      strike.start(now);
+      strike.stop(now + 0.11);
+
+      [
+        { ratio: 1, gain: 0.55, delay: 0, detune: -4 },
+        { ratio: 1.505, gain: 0.28, delay: 0.018, detune: 7 },
+        { ratio: 2.012, gain: 0.18, delay: 0.032, detune: -9 },
+        { ratio: 2.98, gain: 0.1 * profile.sparkle, delay: 0.045, detune: 11 }
+      ].forEach(({ ratio, gain, delay, detune }) => {
+        const osc = ctx.createOscillator();
+        const toneGain = ctx.createGain();
+        osc.type = ratio > 2 ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(profile.base * ratio, now + delay);
+        osc.detune.setValueAtTime(detune, now + delay);
+        toneGain.gain.setValueAtTime(0.0001, now + delay);
+        toneGain.gain.exponentialRampToValueAtTime(gain, now + delay + 0.018);
+        toneGain.gain.exponentialRampToValueAtTime(0.0001, now + delay + profile.decay);
+        osc.connect(toneGain);
+        toneGain.connect(master);
+        osc.start(now + delay);
+        osc.stop(now + delay + profile.decay + 0.08);
+      });
+    }
+
+    function animateGooseTap(target) {
+      if (!target) return;
+      target.classList.remove('is-ringing');
+      void target.offsetWidth;
+      target.classList.add('is-ringing');
+      clearTimeout(animateGooseTap._timer);
+      animateGooseTap._timer = setTimeout(() => target.classList.remove('is-ringing'), 520);
+    }
+
+    function vibrateGooseTap() {
+      if (navigator.vibrate) navigator.vibrate([18, 28, 22]);
+    }
+
+    function tapGoose(event = null) {
       const tier = getGooseTier();
+      playGooseSound(tier);
+      vibrateGooseTap();
+      animateGooseTap(event && event.currentTarget ? event.currentTarget : document.getElementById('tapGoose'));
       const replies = {
         newbie: [
           '🔔 叮咚！小鹅被你敲醒啦～\n很高兴认识你！如果有表达上的小烦恼，随时再来找会说AI玩哦，我们一直都在～',
@@ -261,8 +365,9 @@
       const bubble = document.createElement('div');
       bubble.id = 'gooseReplyBubble';
       bubble.className = 'goose-reply-bubble show';
+      bubble.setAttribute('aria-live', 'polite');
       bubble.innerHTML = text.split('\n').map(line => escapeHtml(line)).join('<br>');
-      const statsPanel = document.querySelector('.ai-panel.ai-stats');
+      const statsPanel = document.querySelector('.ai-native-pane.active .ai-panel.ai-stats') || document.querySelector('.ai-panel.ai-stats');
       if (statsPanel) {
         statsPanel.parentNode.insertBefore(bubble, statsPanel.nextSibling);
       }
@@ -336,6 +441,7 @@
     function closeAllFloating() {
       document.querySelectorAll('.drawer,.assistant,.reply-modal,.space-panel,.ai-entry-menu,.emoji-panel').forEach(el => el.classList.remove('show'));
       document.getElementById('ctxMenu').classList.remove('show');
+      document.getElementById('personaActionMenu').classList.remove('show');
       document.getElementById('plusBtn').classList.remove('close-plus');
       document.getElementById('chatEmoji').classList.remove('active');
       document.getElementById('app').classList.remove('plus-mode');
@@ -363,6 +469,7 @@
 
     function closeAiDetail() {
       showDetailScreen('overview');
+      personaSetupReturnContext = null;
       goBackInsideApp('chat');
     }
 
@@ -521,7 +628,256 @@
     }
 
     function currentPersona() {
-      return aiPersonaMeta.find(item => item[0] === aiSettings.persona) || aiPersonaMeta[0];
+      if (!aiSettings.personaConfirmed) return null;
+      return aiPersonaMeta.find(item => item[0] === aiSettings.persona) || null;
+    }
+
+    const personaDefaults = {
+      warm: {
+        tone: ['礼貌', '委婉', '有边界'],
+        edit: ['更礼貌', '更委婉'],
+        reply: ['友好'],
+        space: ['自然日常版'],
+        length: '适中',
+        hint: '默认会礼貌、自然、有边界地表达'
+      },
+      eq: {
+        tone: ['高情商', '礼貌'],
+        edit: ['更正式', '更真诚'],
+        reply: ['友好'],
+        space: ['高情商版'],
+        length: '适中',
+        hint: '默认会更清晰、得体，适合正式沟通'
+      },
+      meme: {
+        tone: ['抽象', '幽默'],
+        edit: ['更有梗', '更抽象'],
+        reply: ['幽默', '抽象'],
+        space: ['抽象有梗版'],
+        length: '适中',
+        hint: '默认会轻松一点、有网感，但不会乱飞'
+      },
+      cool: {
+        tone: ['有边界'],
+        edit: ['更正式'],
+        reply: ['高冷'],
+        space: ['情绪氛围版'],
+        length: '简短',
+        hint: '默认会短句、克制、少废话'
+      },
+      loose: {
+        tone: ['幽默', '真诚'],
+        edit: ['更委婉', '更有梗'],
+        reply: ['友好', '幽默'],
+        space: ['日常碎碎念'],
+        length: '适中',
+        hint: '默认会更松弛、更像熟人聊天'
+      }
+    };
+
+    function currentPersonaDefaults() {
+      const persona = currentPersona();
+      if (!persona) return { tone: [], edit: [], reply: [], space: [], length: '', hint: '' };
+      return personaDefaults[persona[0]] || { tone: [], edit: [], reply: [], space: [], length: '', hint: '' };
+    }
+
+    function withPersonaDefaults(kind, selected) {
+      const list = Array.isArray(selected) ? selected.filter(Boolean) : [];
+      if (list.length) return list;
+      const defaults = currentPersonaDefaults();
+      if (kind === 'tone') return defaults.tone.slice();
+      if (kind === 'edit') return defaults.edit.slice();
+      if (kind === 'reply') return defaults.reply.slice();
+      if (kind === 'space') return defaults.space.slice();
+      return [];
+    }
+
+    function defaultLengthIfEmpty(selected) {
+      return selected || currentPersonaDefaults().length || '适中';
+    }
+
+    function personaUsageText() {
+      const persona = currentPersona();
+      if (!persona) return '';
+      return `当前默认按「${persona[1]}」生成：${currentPersonaDefaults().hint}。展开可选项后手动选择会覆盖默认人格。`;
+    }
+
+    function updatePersonaUsageHints() {
+      ['sayPersonaHint', 'editPersonaHint', 'replyPersonaHint', 'spacePersonaHint'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = '';
+        el.style.display = 'none';
+      });
+      updatePersonaShortcutLabels();
+      syncPersonaDefaultChipVisuals();
+    }
+
+    function updatePersonaShortcutLabels() {
+      const persona = currentPersona();
+      document.querySelectorAll('.persona-action-group').forEach(group => {
+        group.classList.toggle('has-persona', Boolean(persona));
+      });
+      document.querySelectorAll('.persona-shortcut').forEach(button => {
+        if (persona) {
+          button.textContent = `你的默认风格：${persona[1]}`;
+          button.title = `你的默认风格：${persona[1]}。点开后可选择进入详情页或关闭默认风格。`;
+          button.classList.add('has-persona');
+          button.setAttribute('aria-label', `你的默认风格是${persona[1]}，点开后可选择进入详情页或关闭默认风格`);
+        } else {
+          button.textContent = '设置默认风格';
+          button.title = '设置默认风格';
+          button.classList.remove('has-persona');
+          button.setAttribute('aria-label', '设置默认风格');
+        }
+      });
+    }
+
+    function clearPersonaDefault(event = null) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      const source = personaActionSource || (event && event.currentTarget) || null;
+      aiSettings.persona = '';
+      aiSettings.personaConfirmed = false;
+      aiSettings.personaPromptDismissed = true;
+      personaActionSource = null;
+      sayToneTouched = false;
+      sayLengthTouched = false;
+      editStyleTouched = false;
+      replyToneTouched = false;
+      spaceStyleTouched = false;
+      persistAiSettings();
+      renderAiDetail();
+      document.getElementById('personaActionMenu').classList.remove('show');
+      showPlaceholderToast('已关闭默认风格，后续会按你本次填写的要求生成。', event || (source ? { currentTarget: source } : null));
+    }
+
+    function goPersonaSetupFromSource(source) {
+      personaSetupReturnContext = getPersonaSetupReturnContext(source);
+      aiSettings.personaPromptDismissed = true;
+      persistAiSettings();
+      closeAllFloating();
+      openAiDetail('personas');
+    }
+
+    function openPersonaActionMenu(event, source) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      if (!currentPersona()) {
+        goPersonaSetupFromSource(source);
+        return;
+      }
+      personaActionSource = source;
+      const menu = document.getElementById('personaActionMenu');
+      const appRect = document.getElementById('app').getBoundingClientRect();
+      const sourceRect = source.getBoundingClientRect();
+      const point = event && event.touches && event.touches[0] ? event.touches[0] : event;
+      const rawX = point && Number.isFinite(point.clientX) ? point.clientX : sourceRect.left + sourceRect.width / 2;
+      const rawY = point && Number.isFinite(point.clientY) ? point.clientY : sourceRect.bottom;
+      const x = Math.max(12, Math.min(appRect.width - 200, rawX - appRect.left - 94));
+      const y = Math.max(68, Math.min(appRect.height - 98, rawY - appRect.top + 8));
+      menu.style.left = `${x}px`;
+      menu.style.top = `${y}px`;
+      menu.classList.add('show');
+    }
+
+    function bindPersonaShortcut(button) {
+      let timer = null;
+      let suppressClick = false;
+      const clear = () => {
+        clearTimeout(timer);
+        timer = null;
+      };
+      button.addEventListener('pointerdown', (event) => {
+        if (event.button && event.button !== 0) return;
+        clear();
+        timer = setTimeout(() => {
+          suppressClick = true;
+          openPersonaActionMenu(event, button);
+        }, 560);
+      });
+      button.addEventListener('pointerup', clear);
+      button.addEventListener('pointerleave', clear);
+      button.addEventListener('pointercancel', clear);
+      button.addEventListener('contextmenu', (event) => openPersonaActionMenu(event, button));
+      button.addEventListener('click', (event) => {
+        if (suppressClick) {
+          event.preventDefault();
+          event.stopPropagation();
+          suppressClick = false;
+          return;
+        }
+        if (currentPersona()) openPersonaActionMenu(event, button);
+        else goPersonaSetupFromSource(button);
+      });
+    }
+
+    function updatePersonaSetupPrompt() {
+      const show = !aiSettings.personaConfirmed && !aiSettings.personaPromptDismissed;
+      document.querySelectorAll('.persona-setup-banner').forEach(el => {
+        el.classList.toggle('show', show);
+      });
+    }
+
+    function confirmCurrentPersona() {
+      aiSettings.personaConfirmed = true;
+      aiSettings.personaPromptDismissed = true;
+      persistAiSettings();
+      renderAiDetail();
+    }
+
+    function dismissPersonaPrompt() {
+      aiSettings.personaPromptDismissed = true;
+      persistAiSettings();
+      updatePersonaSetupPrompt();
+    }
+
+    function getPersonaSetupReturnContext(source) {
+      if (!source) return null;
+      if (source.closest('#replyModal')) {
+        return { view: 'chat', overlay: 'reply' };
+      }
+      if (source.closest('#spacePanel')) {
+        return { view: 'space', overlay: 'spacePolish' };
+      }
+      if (source.closest('#assistant')) {
+        const editVisible = document.getElementById('editPane').style.display !== 'none';
+        return { view: 'chat', overlay: 'assistant', pane: editVisible ? 'edit' : 'say' };
+      }
+      return null;
+    }
+
+    function returnFromPersonaSetup() {
+      const context = personaSetupReturnContext;
+      personaSetupReturnContext = null;
+      if (!context) {
+        showDetailScreen('overview');
+        return;
+      }
+
+      showDetailScreen('overview');
+      switchView(context.view, { historyMode: 'replace' });
+      if (context.overlay === 'assistant') {
+        openAssistantPanel(context.pane || 'say');
+        return;
+      }
+      if (context.overlay === 'reply') {
+        document.getElementById('replyModal').classList.add('show');
+        syncFeatureAvailability();
+        showShade();
+        return;
+      }
+      if (context.overlay === 'spacePolish') {
+        openSpacePolishPanel();
+      }
+    }
+
+    function goPersonaSetup(event = null) {
+      goPersonaSetupFromSource(event && event.currentTarget);
     }
 
     function renderFeatureCard([key, title, desc, symbol]) {
@@ -562,17 +918,25 @@
     }
 
     function renderPersonaRow([key, title, desc], compact = false) {
+      const active = aiSettings.personaConfirmed && aiSettings.persona === key;
       const row = document.createElement('button');
-      row.className = `persona-row ${compact ? 'compact' : ''} ${aiSettings.persona === key ? 'active' : ''}`;
+      row.className = `persona-row ${compact ? 'compact' : ''} ${active ? 'active' : ''}`;
       row.type = 'button';
       row.dataset.personaKey = key;
       row.innerHTML = `
         <div class="persona-avatar"></div>
         <div class="persona-copy"><b>${title}</b><span>${desc}</span></div>
-        <div class="persona-check">${aiSettings.persona === key ? '✓' : compact ? '›' : '设为默认'}</div>
+        <div class="persona-check">${active ? '✓' : compact ? '›' : '设为默认'}</div>
       `;
       row.addEventListener('click', () => {
         aiSettings.persona = key;
+        aiSettings.personaConfirmed = true;
+        aiSettings.personaPromptDismissed = true;
+        sayToneTouched = false;
+        sayLengthTouched = false;
+        editStyleTouched = false;
+        replyToneTouched = false;
+        spaceStyleTouched = false;
         persistAiSettings();
         renderAiDetail();
         if (compact) showDetailScreen('personas');
@@ -586,7 +950,6 @@
       document.getElementById('enabledFeatureCount').textContent = enabled;
       document.getElementById('featureEnabledStat').textContent = enabled;
       document.getElementById('personaCount').textContent = aiPersonaMeta.length;
-      document.getElementById('entryVisibleStat').textContent = aiSettings.floating ? '浮窗' : '已显示';
       document.getElementById('assistantFloat').classList.toggle('show', aiSettings.floating);
       document.getElementById('aiMenuFloat').textContent = aiSettings.floating ? '关闭浮窗' : '浮窗形式';
 
@@ -603,13 +966,20 @@
       aiPersonaMeta.slice(0, 3).forEach(item => overviewPersonaList.appendChild(renderPersonaRow(item, true)));
 
       const currentCard = document.getElementById('currentPersonaCard');
-      currentCard.innerHTML = `
-        <div class="persona-row active current-persona" data-persona-key="${persona[0]}" style="border:0;padding:0;">
-          <div class="persona-avatar"></div>
-          <div class="persona-copy"><span>当前默认人格</span><b>${persona[1]}</b><span>${persona[2]}</span></div>
-          <div class="persona-check">✓</div>
-        </div>
-      `;
+      currentCard.innerHTML = persona
+        ? `
+          <div class="persona-row active current-persona" data-persona-key="${persona[0]}" style="border:0;padding:0;">
+            <div class="persona-avatar"></div>
+            <div class="persona-copy"><span>当前默认人格</span><b>${persona[1]}</b><span>${persona[2]}</span></div>
+            <div class="persona-check">✓</div>
+          </div>
+        `
+        : `
+          <div class="persona-empty-state">
+            <b>还没有默认人格</b>
+            <span>选择一个人格后，帮我说、帮我改、帮我回和说说润色才会按它作为默认风格。</span>
+          </div>
+        `;
 
       const personaList = document.getElementById('personaOptionList');
       personaList.innerHTML = '';
@@ -636,6 +1006,8 @@
       });
 
       syncFeatureAvailability();
+      updatePersonaUsageHints();
+      updatePersonaSetupPrompt();
     }
 
     function startPreviewSpeech(buttonId, inputId, statusId) {
@@ -686,8 +1058,11 @@
         ? (currentChatReadProfiles[currentChatId] || currentChatReadProfiles.pcg)
         : target;
       aiSettings.persona = currentProfile.persona;
+      aiSettings.personaConfirmed = true;
+      aiSettings.personaPromptDismissed = true;
       aiSettings.hasReadStyle = true;
       aiSettings.readSummary = currentProfile.summary(recent.length);
+      persistAiSettings();
       renderAiDetail();
     }
 
@@ -739,17 +1114,23 @@
     function getAiGenerationContext(options = {}) {
       const thread = chatThreads[currentChatId] || chatThreads.pcg;
       const persona = currentPersona();
-      const profile = currentChatReadProfiles[currentChatId] || currentChatReadProfiles.pcg;
+      const defaults = currentPersonaDefaults();
       const readSummary = aiSettings.hasReadStyle
         ? aiSettings.readSummary
-        : (profile ? profile.summary((thread.messages || []).length) : '');
+        : '';
 
       return {
         threadTitle: thread.title,
         sourceName: options.sourceName || '',
-        personaKey: persona[0],
-        personaLabel: persona[1],
-        personaDesc: persona[2],
+        personaKey: persona ? persona[0] : '',
+        personaLabel: persona ? persona[1] : '',
+        personaDesc: persona ? persona[2] : '',
+        personaDefaultTone: defaults.tone,
+        personaDefaultEditStyles: defaults.edit,
+        personaDefaultReplyTone: defaults.reply,
+        personaDefaultSpaceStyles: defaults.space,
+        personaDefaultLength: defaults.length,
+        personaWasConfirmed: aiSettings.personaConfirmed,
         readSummary,
         conversation: options.includeConversation === false ? [] : getReplyContextMessages()
       };
@@ -864,7 +1245,7 @@
     renderChatThread(currentChatId);
     currentView = 'messages';
     appHistoryDepth = 0;
-    rememberBrowserView('messages', 'replace');
+    rememberBrowserView('intro', 'replace');
     window.addEventListener('popstate', (event) => {
       const state = event.state;
       if (!state || !state.speakBetterView) return;
@@ -892,18 +1273,24 @@
         showPlaceholderToast(el.title || '鹅目前只负责帮你说话，别的功能……就等鹅下次展示！', e);
       });
     });
-    document.getElementById('backToMessages').addEventListener('click', () => goBackInsideApp('messages'));
+    document.getElementById('backToMessages').addEventListener('click', () => switchView('messages', { historyMode: 'replace' }));
     document.getElementById('openSpaceFromDynamic').addEventListener('click', () => switchView('qzone'));
     document.getElementById('backQzoneToDynamic').addEventListener('click', () => goBackInsideApp('dynamic'));
     document.getElementById('openQzoneTalk').addEventListener('click', () => switchView('qzoneTalk'));
     document.getElementById('openQzoneTalkFromShare').addEventListener('click', () => switchView('qzoneTalk'));
     document.getElementById('backTalkToQzone').addEventListener('click', () => goBackInsideApp('qzone'));
     document.getElementById('openComposeFromTalk').addEventListener('click', () => switchView('space'));
+    document.getElementById('startIntroExperience').addEventListener('click', () => {
+      personaSetupReturnContext = null;
+      openAiDetail('overview');
+    });
+    document.getElementById('skipIntroExperience').addEventListener('click', () => switchView('messages'));
 
     function switchView(view, options = {}) {
       const { historyMode = 'push' } = options;
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       const map = {
+        intro: 'productIntroView',
         messages: 'messageView',
         chat: 'chatView',
         qzone: 'qzoneView',
@@ -915,7 +1302,9 @@
       document.getElementById(map[view]).classList.add('active');
       currentView = view;
       document.getElementById('app').classList.toggle('compose-mode', view === 'space');
+      document.getElementById('app').classList.toggle('intro-mode', view === 'intro');
       const statusByView = {
+        intro: ['10:38', '82'],
         messages: ['10:38', '82'],
         chat: ['10:38', '82'],
         qzone: ['10:38', '82'],
@@ -926,7 +1315,7 @@
       };
       document.getElementById('statusTime').textContent = statusByView[view][0];
       document.getElementById('statusBattery').textContent = statusByView[view][1];
-      document.getElementById('qqTabs').classList.toggle('hidden', view === 'chat' || view === 'space' || view === 'qzone' || view === 'qzoneTalk' || view === 'aiDetail');
+      document.getElementById('qqTabs').classList.toggle('hidden', view === 'intro' || view === 'chat' || view === 'space' || view === 'qzone' || view === 'qzoneTalk' || view === 'aiDetail');
       document.querySelectorAll('.tab').forEach(t => {
         const active = (view === 'messages' && t.dataset.view === 'messages') || (view === 'dynamic' && t.dataset.view === 'dynamic');
         t.classList.toggle('active', active);
@@ -1031,6 +1420,7 @@
       document.getElementById('assistant').classList.add('show');
       selectAssistantPane(preferredPane, event, true);
       syncFeatureAvailability();
+      updatePersonaUsageHints();
       showShade();
     }
 
@@ -1044,14 +1434,33 @@
     });
     document.getElementById('aiMenuDetail').addEventListener('click', () => {
       closeAiEntryMenu();
+      personaSetupReturnContext = null;
       openAiDetail('overview');
     });
     document.getElementById('backAiDetail').addEventListener('click', closeAiDetail);
     document.getElementById('goFeatureManager').addEventListener('click', () => showDetailScreen('features'));
-    document.getElementById('goPersonaManager').addEventListener('click', () => showDetailScreen('personas'));
-    document.getElementById('tapGoose').addEventListener('click', tapGoose);
+    document.getElementById('goPersonaManager').addEventListener('click', () => {
+      personaSetupReturnContext = null;
+      showDetailScreen('personas');
+    });
+    ['tapGoose', 'featureTapGoose'].forEach(id => {
+      const target = document.getElementById(id);
+      if (!target) return;
+      target.addEventListener('click', tapGoose);
+      target.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        tapGoose(event);
+      });
+    });
     document.querySelectorAll('[data-native-goto]').forEach(btn => {
-      btn.addEventListener('click', () => showDetailScreen(btn.dataset.nativeGoto));
+      btn.addEventListener('click', () => {
+        if (btn.closest('[data-native-detail="personas"]') && btn.dataset.nativeGoto === 'overview') {
+          returnFromPersonaSetup();
+          return;
+        }
+        showDetailScreen(btn.dataset.nativeGoto);
+      });
     });
     document.getElementById('aiPreviewVoice').addEventListener('click', () => startPreviewSpeech('aiPreviewVoice', 'aiPreviewInput', 'aiPreviewStatus'));
     document.getElementById('featurePreviewVoice').addEventListener('click', () => startPreviewSpeech('featurePreviewVoice', 'featurePreviewInput', 'featurePreviewStatus'));
@@ -1081,7 +1490,13 @@
     });
     document.getElementById('savePersonaSettings').addEventListener('click', () => {
       const persona = currentPersona();
+      if (!persona) {
+        document.getElementById('personaSaveState').textContent = '还没有选择默认人格。可以先点一个人格，也可以暂时不设置。';
+        return;
+      }
       const scopes = aiScopeMeta.filter(([key]) => aiSettings.scopes.includes(key)).map(([, title]) => title).join('、');
+      aiSettings.personaConfirmed = true;
+      aiSettings.personaPromptDismissed = true;
       persistAiSettings();
       document.getElementById('personaSaveState').textContent = `已保存：${persona[1]}，应用于${scopes}。`;
       renderAiDetail();
@@ -1089,6 +1504,28 @@
     renderAiDetail();
     document.querySelectorAll('[data-feature-context-toggle]').forEach(button => {
       button.addEventListener('click', () => toggleFeatureFromContext(button.dataset.featureContextToggle));
+    });
+    document.querySelectorAll('[data-persona-setup]').forEach(button => {
+      if (button.classList.contains('persona-shortcut')) bindPersonaShortcut(button);
+      else button.addEventListener('click', goPersonaSetup);
+    });
+    document.querySelectorAll('[data-persona-clear]').forEach(button => {
+      button.addEventListener('click', clearPersonaDefault);
+    });
+    document.getElementById('personaActionMenu').addEventListener('click', (event) => {
+      const action = event.target.closest('[data-persona-action]');
+      if (!action) return;
+      event.stopPropagation();
+      if (action.dataset.personaAction === 'detail') {
+        const source = personaActionSource;
+        personaActionSource = null;
+        goPersonaSetupFromSource(source);
+      } else if (action.dataset.personaAction === 'clear') {
+        clearPersonaDefault(event);
+      }
+    });
+    document.querySelectorAll('[data-persona-dismiss]').forEach(button => {
+      button.addEventListener('click', dismissPersonaPrompt);
     });
     syncFeatureAvailability();
 
@@ -1103,6 +1540,7 @@
     document.querySelectorAll('.chips').forEach(group => {
       group.addEventListener('click', (e) => {
         if (!e.target.classList.contains('chip')) return;
+        markChipGroupTouched(group.id);
         const multi = ['toneChips','editStyleChips','spaceStyleChips'].includes(group.id);
         if (!multi) group.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
         e.target.classList.toggle('active');
@@ -1111,6 +1549,50 @@
 
     function activeTexts(id) {
       return Array.from(document.getElementById(id).querySelectorAll('.active')).map(x => x.textContent);
+    }
+
+    function markChipGroupTouched(id) {
+      if (id === 'toneChips') sayToneTouched = true;
+      if (id === 'lengthChips') sayLengthTouched = true;
+      if (id === 'editStyleChips') editStyleTouched = true;
+      if (id === 'replyToneChips') replyToneTouched = true;
+      if (id === 'spaceStyleChips') spaceStyleTouched = true;
+    }
+
+    function selectedSayTone() {
+      return sayToneTouched ? activeTexts('toneChips') : [];
+    }
+
+    function selectedSayLength() {
+      return sayLengthTouched ? activeTexts('lengthChips').join('') : '';
+    }
+
+    function selectedEditStyles() {
+      return editStyleTouched ? activeTexts('editStyleChips') : [];
+    }
+
+    function selectedReplyTone() {
+      return replyToneTouched ? activeTexts('replyToneChips') : [];
+    }
+
+    function selectedSpaceStyles() {
+      return spaceStyleTouched ? activeTexts('spaceStyleChips') : [];
+    }
+
+    function setChipSelections(id, texts) {
+      const group = document.getElementById(id);
+      if (!group) return;
+      const selected = Array.isArray(texts) ? texts : [texts];
+      group.querySelectorAll('.chip').forEach(chip => chip.classList.toggle('active', selected.includes(chip.textContent)));
+    }
+
+    function syncPersonaDefaultChipVisuals() {
+      const defaults = currentPersonaDefaults();
+      if (!sayToneTouched) setChipSelections('toneChips', defaults.tone);
+      if (!sayLengthTouched) setChipSelections('lengthChips', defaults.length ? [defaults.length] : []);
+      if (!editStyleTouched) setChipSelections('editStyleChips', defaults.edit);
+      if (!replyToneTouched) setChipSelections('replyToneChips', defaults.reply);
+      if (!spaceStyleTouched) setChipSelections('spaceStyleChips', defaults.space);
     }
 
     document.getElementById('voiceSay').addEventListener('click', () => {
@@ -1153,10 +1635,13 @@
         onFinal: parseReplyVoice
       });
     });
-    document.getElementById('parseVoice').addEventListener('click', () => {
-      if (!ensureFeature('say')) return;
-      parseVoiceIntent(document.getElementById('voiceIntent').value.trim());
-    });
+    const parseVoiceButton = document.getElementById('parseVoice');
+    if (parseVoiceButton) {
+      parseVoiceButton.addEventListener('click', () => {
+        if (!ensureFeature('say')) return;
+        parseVoiceIntent(document.getElementById('voiceIntent').value.trim());
+      });
+    }
     document.getElementById('parseEditVoice').addEventListener('click', () => {
       if (!ensureFeature('rewrite')) return;
       parseEditVoice(document.getElementById('editVoiceIntent').value.trim());
@@ -1208,11 +1693,15 @@
       setSayLoading(true, nextBatch);
       renderResultNotice('sayResults', '正在调用 DeepSeek 生成表达建议...');
       try {
+        const manualTone = selectedSayTone();
+        const manualLength = selectedSayLength();
         const items = await requestAssistItems('say', {
           target: document.getElementById('target').value,
           purpose: document.getElementById('purpose').value.trim() || document.getElementById('voiceIntent').value.trim(),
-          tone: activeTexts('toneChips'),
-          length: activeTexts('lengthChips').join(''),
+          tone: withPersonaDefaults('tone', manualTone),
+          userToneOverride: manualTone.length > 0,
+          length: defaultLengthIfEmpty(manualLength),
+          userLengthOverride: Boolean(manualLength),
           intent: document.getElementById('voiceIntent').value.trim(),
           likeMe: sayLikeMe,
           rerollIndex: sayBatch,
@@ -1339,8 +1828,16 @@
         [/真诚|诚恳|认真/.test(text), '真诚'],
         [/傲娇|嘴硬/.test(text), '傲娇'],
         [/幽默|好笑|轻松/.test(text), '幽默']
-      ]);
-      setSingleChip('lengthChips', /详细|长一点/.test(text) ? '详细' : (/适中|正常/.test(text) ? '适中' : '简短'));
+      ], false);
+      sayToneTouched = activeTexts('toneChips').length > 0;
+      if (!sayToneTouched) setChipSelections('toneChips', currentPersonaDefaults().tone);
+      if (/详细|长一点|适中|正常|简短|短一点/.test(text)) {
+        setSingleChip('lengthChips', /详细|长一点/.test(text) ? '详细' : (/适中|正常/.test(text) ? '适中' : '简短'));
+        sayLengthTouched = true;
+      } else {
+        sayLengthTouched = false;
+        syncPersonaDefaultChipVisuals();
+      }
       const optional = document.querySelector('#sayPane .optional-fields');
       if (optional) optional.open = true;
       setVoiceStatus(status, '已把这句语音拆成可编辑选项，可以直接生成建议。', 'ok');
@@ -1363,6 +1860,8 @@
         [/抽象|发疯/.test(text), '更抽象'],
         [/真诚|诚恳|认真/.test(text), '更真诚']
       ], false);
+      editStyleTouched = activeTexts('editStyleChips').length > 0;
+      if (!editStyleTouched) setChipSelections('editStyleChips', currentPersonaDefaults().edit);
       const optional = document.querySelector('#editPane .optional-fields');
       if (optional) optional.open = true;
       document.getElementById('editResults').innerHTML = '';
@@ -1383,14 +1882,20 @@
       document.getElementById('spaceText').value = draft.slice(0, 80);
       document.getElementById('spaceVoiceIntent').value = draft.slice(0, 80);
       updateSpaceDraftPreview();
-      let spaceStyle = '自然日常版';
+      let spaceStyle = '';
       if (/抽象|有梗|发疯/.test(text)) spaceStyle = '抽象有梗版';
       else if (/文艺|伤感|emo/.test(text)) spaceStyle = '文艺伤感风';
       else if (/励志|元气|打气/.test(text)) spaceStyle = '励志元气风';
       else if (/碎碎念|日常/.test(text)) spaceStyle = '日常碎碎念';
       else if (/情绪|氛围/.test(text)) spaceStyle = '情绪氛围版';
       else if (/高情商|温柔/.test(text)) spaceStyle = '高情商版';
-      setSingleChip('spaceStyleChips', spaceStyle);
+      if (spaceStyle) {
+        setSingleChip('spaceStyleChips', spaceStyle);
+        spaceStyleTouched = true;
+      } else {
+        spaceStyleTouched = false;
+        setChipSelections('spaceStyleChips', currentPersonaDefaults().space);
+      }
       document.getElementById('spaceResults').innerHTML = '';
       setVoiceStatus(status, '已更新说说草稿，选择风格后即可生成润色版本。', 'ok');
     }
@@ -1409,7 +1914,9 @@
         [/拒绝|不方便|不想/.test(text), '拒绝'],
         [/高冷|冷淡|简短/.test(text), '高冷'],
         [/抽象|发疯/.test(text), '抽象']
-      ]);
+      ], false);
+      replyToneTouched = activeTexts('replyToneChips').length > 0;
+      if (!replyToneTouched) setChipSelections('replyToneChips', currentPersonaDefaults().reply);
       document.getElementById('replyResults').innerHTML = '';
       const optional = document.querySelector('#replyModal .optional-fields');
       if (optional) optional.open = true;
@@ -1434,11 +1941,26 @@
     function generateSay() {
       const target = document.getElementById('target').value;
       const purpose = document.getElementById('purpose').value.trim() || document.getElementById('voiceIntent').value.trim();
-      const tones = activeTexts('toneChips').join('');
+      const tones = withPersonaDefaults('tone', selectedSayTone()).join('');
       const like = sayLikeMe;
+      const persona = currentPersona();
+      const personaKey = persona ? persona[0] : '';
 
       if (/催|作业|进度|DDL/i.test(purpose)) {
         if (target === '小组成员') {
+          if (!like && personaKey === 'meme') {
+            return pickBatch([
+              ['我准备开始整合啦，大家这周五前把各自部分丢我一下，不然 PPT 要开始尖叫了🥲', 'DDL 已经在门口探头了，大家方便这周五前先发我一版吗？', '我们先把进度从危险区拖回来，大家这周五前把负责部分发我可以吗？'],
+              ['先交一个能活的版本也行哈哈，大家这周五前把各自那块发我一下可以嘛？', '我们离 DDL 有点近了🥲 大家方便先把初稿发我，我后面统一顺一下。', 'PPT 不能自己长出来，大家这周五前把负责部分救一下可以吗？'],
+              ['我开始收材料啦，大家这周五前发我一下呀，不然整合区要爆炸了。', '怕后面整合来不及，大家这周五前先给我当前版本就行。', '我们把这个作业从危险区拖回来，大家这周五前发我一版可以吗？']
+            ]);
+          }
+          if (!like && personaKey === 'cool') {
+            return ['我开始整合了，大家这周五前把各自部分发我。', 'DDL 比较近，麻烦这周五前给我一版。', '我需要预留整合时间，大家这周五前发我。'];
+          }
+          if (!like && personaKey === 'eq') {
+            return ['我这边准备开始整合 PPT，想和大家确认一下，各自负责的部分这周五前方便发我吗？', '为了预留整合和修改时间，麻烦大家尽量这周五前把各自内容发我。', '我会先统一排版，大家如果能在这周五前发我各自部分，我这边会更好推进。'];
+          }
           return pickBatch(like
             ? [
                 ['我准备开始整合啦，大家各自的部分大概什么时候能发我呀~', 'DDL 有点近了🥲 大家方便这周五前把各自的部分发我吗？我好先合进去。', '救命，DDL 在追我们了哈哈，大家这周五前能不能先把各自部分救一下？'],
@@ -1464,6 +1986,9 @@
             ]);
       }
       if (/请假|延期|老师/.test(purpose) || target === '老师') {
+        if (personaKey === 'cool') {
+          return ['老师您好，我这边想请假一次，后续内容会及时补上。', '老师您好，这次任务我想申请稍微延期提交。', '老师您好，我想确认一下这次材料最晚提交时间。'];
+        }
         return pickBatch([
           ['老师您好，我想和您说明一下情况，今天因为临时原因可能无法按时到场，想请问是否可以请假？', '老师您好，打扰您了。我这边有一点特殊情况，想申请请假一次，后续内容我会及时补上。', '老师您好，请问这次任务是否可以稍微延期提交？我会尽快完成并补交给您。'],
           ['老师您好，今天临时有些情况需要处理，想向您请假一次，请问可以吗？', '老师您好，不好意思打扰您。我今天可能无法按时参加，想跟您说明并申请请假。', '老师您好，这次提交我这边可能需要多一点时间，请问是否可以延期到今晚补交？'],
@@ -1511,6 +2036,19 @@
           ['这件事我想认真说明一下，不是情绪上头，是确实需要沟通。', '我想把真实想法说清楚，也希望你不要误会。', '我很重视这次沟通，所以想说得坦诚一点。'],
           ['我先说我的真实感受，如果有哪里不合适我们再一起调整。', '我不是想责怪谁，只是想把事情说清楚。', '我希望这句话听起来是真诚的，而不是在敷衍你。']
         ]);
+      }
+
+      if (personaKey === 'eq') {
+        return ['我这边理解您的意思，会先确认具体情况，再给出明确回复。', '好的，我会尽快整理清楚，再和您同步结果。', '我先把信息确认完整，之后第一时间回复您。'];
+      }
+      if (personaKey === 'meme') {
+        return ['懂了，我先把这件事从混乱里捞出来，再给你一个能发的版本。', '我明白了，这句话需要一点自然，也需要一点别太像客服。', '让我把精神状态折叠成一句能发出去的话。'];
+      }
+      if (personaKey === 'cool') {
+        return ['可以，我先确认。', '行，我看完回复你。', '我知道了，晚点给你结果。'];
+      }
+      if (personaKey === 'loose') {
+        return ['行，我先看看怎么说比较自然，晚点回你。', '懂啦，我先整理一下，等下发你。', '可以，我先把话顺一下，不整太正式。'];
       }
       return pickBatch([
         ['我明白你的意思，我这边会尽快确认一下。', '可以的，我先看一下情况，稍后回复你。', '收到，我这边先处理一下，有进展再跟你说。'],
@@ -1568,9 +2106,11 @@
       setEditLoading(true);
       renderResultNotice('editResults', '正在调用 DeepSeek 修改表达...');
       try {
+        const manualStyles = selectedEditStyles();
         const items = await requestAssistItems('edit', {
           text,
-          styles: activeTexts('editStyleChips'),
+          styles: withPersonaDefaults('edit', manualStyles),
+          userStyleOverride: manualStyles.length > 0,
           likeMe: editLikeMe,
           risky,
           ...getAiGenerationContext()
@@ -1588,11 +2128,22 @@
     }
 
     function generateEdit(text, risky) {
-      const styles = activeTexts('editStyleChips').join('');
+      const styles = withPersonaDefaults('edit', selectedEditStyles()).join('');
+      const persona = currentPersona();
+      const personaKey = persona ? persona[0] : '';
       if (/真诚/.test(styles)) {
         return ['我想真诚一点表达：' + text.replace(/[？！!]+/g, '。'), '这件事我确实挺在意的，所以想认真说清楚：' + text.replace(/[？！!]+/g, '。'), '我不是想指责，只是想把真实想法说出来：' + text.replace(/[？！!]+/g, '。')];
       }
       if (/作业|交|进度|DDL/.test(text) || risky) {
+        if (!editLikeMe && personaKey === 'meme') {
+          return ['DDL 有点近了🥲 你今晚方便先发个初版吗？我这边先合进去。', '我准备开始整合啦，你那部分今晚能先救一下吗？', '我们先把进度从危险区拖回来，你今晚先给我一版可以吗？'];
+        }
+        if (!editLikeMe && personaKey === 'cool') {
+          return ['你那部分今晚能发我吗？', '我开始整合了，麻烦今晚给我一版。', 'DDL 比较近，你今晚先发我。'];
+        }
+        if (!editLikeMe && personaKey === 'eq') {
+          return ['我这边准备开始整合，想确认一下你负责的部分今晚方便先发我吗？', '为了预留后续整合时间，麻烦你今晚先发我一个初版。', '我会先合整体版本，你那部分如果今晚能发我会更好推进。'];
+        }
         return editLikeMe
           ? ['我准备开始整合啦，你那部分大概什么时候能发我呀~', 'DDL 有点近了🥲 你方便今晚先发个初版吗？', '救命，我们不能被 DDL 带走哈哈，你那部分今晚能先给我吗？']
           : ['我准备开始整合啦，你那部分大概什么时候能发我？', 'DDL 有点近了，你方便今晚先发一个初版吗？我这边好先合进去。', '我这边需要预留整合时间，所以想确认一下你那部分今天能不能发我。'];
@@ -1600,6 +2151,9 @@
       if (/不去|不想|拒绝/.test(text)) {
         return ['谢谢你邀请我，不过我这次可能不太方便参加。', '我这边安排有点冲突，这次可能去不了啦。', '这次我先不参加了，你们玩得开心一点。'];
       }
+      if (personaKey === 'meme') return ['我帮你把这句话改得更自然一点，但保留一点活人感：' + text, '这句可以稍微松一点说：' + text.replace(/[？！!]+/g, '。'), '换成不那么客服的版本：' + text.replace(/[？！!]+/g, '。')];
+      if (personaKey === 'cool') return [text.replace(/[？！!]+/g, '。'), '简短一点：' + text.replace(/[？！!]+/g, '。'), '可以直接说：' + text.replace(/[？！!]+/g, '。')];
+      if (personaKey === 'eq') return ['更得体一点可以说：' + text.replace(/[？！!]+/g, '。'), '我建议这样表达：' + text.replace(/[？！!]+/g, '。'), '如果想更清晰，可以说：' + text.replace(/[？！!]+/g, '。')];
       return ['我帮你把这句话改得更自然一点：' + text, '更委婉一点可以说：' + text.replace(/！/g,'。'), '如果想更高情商一点，可以先说明原因，再表达自己的想法。'];
     }
 
@@ -1707,6 +2261,9 @@
       if (!e.target.closest('#aiEntryMenu') && !e.target.closest('#openAssistant') && !e.target.closest('#assistantFloat')) {
         closeAiEntryMenu();
       }
+      if (!e.target.closest('#personaActionMenu') && !e.target.closest('.persona-shortcut')) {
+        document.getElementById('personaActionMenu').classList.remove('show');
+      }
     });
 
     document.getElementById('ctxMenu').addEventListener('click', (e) => {
@@ -1730,7 +2287,7 @@
         renderEnableNotice('replyResults', 'reply', () => replyGenerateButton.click());
         return;
       }
-      const tone = activeTexts('replyToneChips');
+      const tone = withPersonaDefaults('reply', selectedReplyTone());
       const toneText = tone.join('、');
       const need = document.getElementById('replyNeed').value.trim();
       if (!selectedOriginalMsg) {
@@ -1757,7 +2314,18 @@
 
     function generateReplyFallback(original, tone, need = '') {
       const combined = original + ' ' + need;
+      const persona = currentPersona();
+      const personaKey = persona ? persona[0] : '';
       if (/催|进度|作业|初版|DDL/i.test(combined)) {
+        if (personaKey === 'meme' && !/友好|感谢|拒绝|高冷/.test(tone)) {
+          return ['可以可以，但 DDL 已经在门口探头了🥲 你今晚先发初版就行。', '行，先救一个初版也算功德无量，你大概几点能发我？', '没问题，我们先把它从危险区拖回来，你今晚先给我一版。'];
+        }
+        if (personaKey === 'cool' && !/幽默|抽象|感谢/.test(tone)) {
+          return ['可以，今晚先发我一版。', '行，你大概几点给我？', '先给初版，我这边整合。'];
+        }
+        if (personaKey === 'eq' && !/幽默|抽象|高冷/.test(tone)) {
+          return ['可以的，那你今晚方便先发一个初版吗？我这边先合进去。', '没问题，你大概几点能发我？我好安排整合时间。', '可以，但我们时间有点紧，麻烦你尽量今晚发我一下。'];
+        }
         return tone.includes('幽默') || tone.includes('抽象')
           ? ['可以可以，但 DDL 已经在门口探头了🥲 你今晚先发初版就行。', '行，先救一个初版也算功德无量，你大概几点能发我？', '没问题，我们先把它从危险区拖回来，你今晚先给我一版。']
           : ['可以的，那你今晚方便先发一个初版吗？我这边先合进去。', '没问题，你大概几点能发我？我好安排整合时间。', '可以，但我们时间有点紧，麻烦你尽量今晚发我一下。'];
@@ -1856,9 +2424,11 @@
       setSpaceLoading(true);
       renderResultNotice('spaceResults', '正在调用 DeepSeek 生成说说文案...');
       try {
+        const manualStyles = selectedSpaceStyles();
         const items = await requestAssistItems('space', {
           draft,
-          styles: activeTexts('spaceStyleChips'),
+          styles: withPersonaDefaults('space', manualStyles),
+          userStyleOverride: manualStyles.length > 0,
           likeMe: spaceLikeMe,
           ...getAiGenerationContext({ includeConversation: false })
         });
@@ -1876,9 +2446,21 @@
 
     function generateSpaceCopy() {
       const draft = getSpaceDraft();
-      const styles = activeTexts('spaceStyleChips').join('');
+      const manualStyles = selectedSpaceStyles();
+      const styles = withPersonaDefaults('space', manualStyles).join('');
+      const persona = currentPersona();
+      const personaKey = persona ? persona[0] : '';
       if (spaceLikeMe) {
         return ['本人已进入 PPT 淹没模式，勿扰，除非你会划重点🥲', '复习进度：打开了。精神状态：关闭了。', '不是我不想学，是这门课先对我动手的。'];
+      }
+      if (personaKey === 'meme' && !manualStyles.length) {
+        return ['本人已进入 PPT 淹没模式，勿扰，除非你会划重点🥲', '复习进度：打开了。精神状态：关闭了。', '不是我不想学，是这门课先对我动手的。'];
+      }
+      if (personaKey === 'cool' && !manualStyles.length) {
+        return ['今天就这样。', '累，但过了。', '存个档。'];
+      }
+      if (personaKey === 'eq' && !manualStyles.length) {
+        return ['在混乱里慢慢往前挪，也算是一种认真。', '今天也在努力靠近那个“不慌”的自己。', '复习很累，但每看完一点都算数。'];
       }
       if (/文艺|伤感/.test(styles)) {
         return ['今天的风有点轻，心事有点重，但还是想把这一刻留下来。', '有些日子不用很热闹，安静地经过也算一种纪念。', '把没说出口的情绪，暂时交给这条说说。'];

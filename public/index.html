@@ -4,18 +4,57 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>会说 AI - QQ 表达搭子原型</title>
-  <link rel="stylesheet" href="styles/app.css?v=20260505-context-switches" />
+  <link rel="stylesheet" href="styles/app.css?v=20260506-product-intro-iconfix2" />
 </head>
 <body>
-  <main class="phone" id="app">
+  <main class="phone intro-mode" id="app">
     <div class="statusbar">
       <div class="status-left"><span id="statusTime">10:38</span></div>
       <div class="status-right">
         <span class="alarm"><span class="hand"></span><span class="leg left"></span><span class="leg right"></span></span><span class="fiveg">5G</span><span class="bars"></span><span class="battery" id="statusBattery">82</span>
       </div>
     </div>
+    <!-- 页面 0：产品认知首屏。先解释会说 AI，再进入 QQ 场景。 -->
+    <section class="view product-intro active" id="productIntroView" aria-label="会说 AI 产品介绍">
+      <div class="intro-network" aria-hidden="true">
+        <i></i><i></i><i></i><i></i><i></i>
+      </div>
+      <header class="intro-login-head">
+        <div class="intro-qq-mark" aria-hidden="true"></div>
+        <span>QQ 登录</span>
+        <b>›</b>
+      </header>
+      <div class="intro-launch-badge" aria-label="新上线">
+        <span>新上线</span>
+      </div>
+      <div class="intro-chat-symbol" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <section class="intro-hero-copy">
+        <h1>会说AI</h1>
+        <p><strong>QQ</strong> 新开发 · 内嵌表达助手</p>
+        <div class="intro-trust-line">
+          <span aria-hidden="true"></span>
+          QQ 官方全新推出 | 智能 · 高效 · 贴心
+        </div>
+      </section>
+      <section class="intro-quote-card">
+        <div class="quote-mark quote-left" aria-hidden="true">“</div>
+        <h2>词不达意，<br>言不由衷？</h2>
+        <p>会说 <strong>AI</strong> 帮你轻轻推一把。</p>
+        <div class="quote-mark quote-right" aria-hidden="true">”</div>
+      </section>
+      <div class="intro-actions">
+        <button class="intro-primary" id="startIntroExperience" type="button">
+          <span>立即体验</span>
+          <i aria-hidden="true">›</i>
+        </button>
+        <button class="intro-skip" id="skipIntroExperience" type="button">跳过</button>
+      </div>
+    </section>
+
     <!-- 页面 1：QQ 消息列表。这里有 QQ 底部四栏导航。 -->
-    <section class="view main active" id="messageView">
+    <section class="view main" id="messageView">
       <div class="message-page">
         <div class="profile-head">
           <div class="big-avatar"></div>
@@ -127,7 +166,7 @@
           <div class="ai-panel ai-stats">
             <div class="ai-stat"><div><b id="enabledFeatureCount">5</b><span>已开启功能</span></div></div>
             <div class="ai-stat"><div><b id="personaCount">5</b><span>可选人格</span></div></div>
-            <div class="ai-stat ai-stat-tap" id="tapGoose"><div><b><span class="penguin-head stat-penguin"></span></b><span>敲一敲鹅</span></div></div>
+            <div class="ai-stat ai-stat-tap" id="tapGoose" role="button" tabindex="0" aria-label="敲一敲鹅，播放解压音效"><div><b><span class="penguin-head stat-penguin"></span></b><span>敲一敲鹅</span></div></div>
           </div>
 
           <button class="ai-manager-card" id="goFeatureManager">
@@ -169,7 +208,7 @@
           <div class="ai-panel ai-stats">
             <div class="ai-stat"><div><b id="featureEnabledStat">5</b><span>已开启</span></div></div>
             <div class="ai-stat"><div><b id="recommendedFeatureStat">1</b><span>推荐功能</span></div></div>
-            <div class="ai-stat"><div><b id="entryVisibleStat">已显示</b><span>输入框入口</span></div></div>
+            <div class="ai-stat ai-stat-tap" id="featureTapGoose" role="button" tabindex="0" aria-label="敲一敲鹅，播放解压音效"><div><b><span class="penguin-head stat-penguin"></span></b><span>敲一敲鹅</span></div></div>
           </div>
           <div class="ai-panel" id="featureToggleList"></div>
           <div class="ai-panel">
@@ -392,10 +431,21 @@
           <button class="active" id="sayTab">帮我说</button>
           <button id="editTab">帮我改</button>
         </div>
+        <div class="persona-setup-banner">
+          <span>还没设置默认说话人格。可以先选一个默认风格，也可以暂时不设置。</span>
+          <button type="button" data-persona-setup>去选择</button>
+          <button type="button" data-persona-dismiss>暂不设置</button>
+        </div>
 
         <div id="sayPane">
           <h3 style="margin:0 0 10px;font-size:16px;">帮我说 - 不知道怎么开口？告诉AI</h3>
-          <button class="context-feature-toggle" type="button" data-feature-context-toggle="say" aria-pressed="true">帮我说已开启</button>
+          <div class="feature-style-row">
+            <button class="context-feature-toggle" type="button" data-feature-context-toggle="say" aria-pressed="true">帮我说已开启</button>
+            <div class="persona-action-group">
+              <button class="persona-shortcut" type="button" data-persona-setup>设置默认风格</button>
+            </div>
+          </div>
+          <div class="persona-default-hint" id="sayPersonaHint"></div>
           <div class="voice-intent">
             <label for="voiceIntent">先打字告诉 AI 你想说什么</label>
             <div class="private-input-shell">
@@ -404,8 +454,7 @@
                 <svg viewBox="0 0 24 24"><path d="M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3Z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3M8 21h8"/></svg>
               </button>
             </div>
-            <div class="voice-sub" id="voiceStatus">语音只是辅助入口，公共场合直接打字也可以。</div>
-            <button class="mini-action" id="parseVoice">从这句话拆分可选项</button>
+            <div class="voice-sub" id="voiceStatus"></div>
           </div>
           <details class="optional-fields">
             <summary>补充对象、目的、语气和长度（可选）</summary>
@@ -462,7 +511,13 @@
 
         <div id="editPane" style="display:none;">
           <h3 style="margin:0 0 10px;font-size:16px;">帮我改 - 这话太硬？换个说法</h3>
-          <button class="context-feature-toggle" type="button" data-feature-context-toggle="rewrite" aria-pressed="true">帮我改已开启</button>
+          <div class="feature-style-row">
+            <button class="context-feature-toggle" type="button" data-feature-context-toggle="rewrite" aria-pressed="true">帮我改已开启</button>
+            <div class="persona-action-group">
+              <button class="persona-shortcut" type="button" data-persona-setup>设置默认风格</button>
+            </div>
+          </div>
+          <div class="persona-default-hint" id="editPersonaHint"></div>
           <div class="voice-intent">
             <label for="editText">输入想修改的原句</label>
             <div class="private-input-shell">
@@ -506,6 +561,10 @@
     <!-- 长按菜单 -->
     <div class="context-menu" id="ctxMenu">
     </div>
+    <div class="persona-action-menu" id="personaActionMenu" aria-label="默认风格操作菜单">
+      <button type="button" data-persona-action="detail">进入风格详情页</button>
+      <button type="button" data-persona-action="clear">关闭默认风格</button>
+    </div>
 
     <!-- 帮我回模态框 -->
     <section class="reply-modal" id="replyModal">
@@ -514,7 +573,18 @@
         <button class="close" data-close="replyModal">×</button>
       </div>
       <div class="panel-body">
-        <button class="context-feature-toggle" type="button" data-feature-context-toggle="reply" aria-pressed="true">帮我回已开启</button>
+        <div class="persona-setup-banner">
+          <span>还没设置默认说话人格。可以先选一个默认风格，也可以暂时不设置。</span>
+          <button type="button" data-persona-setup>去选择</button>
+          <button type="button" data-persona-dismiss>暂不设置</button>
+        </div>
+        <div class="feature-style-row">
+          <button class="context-feature-toggle" type="button" data-feature-context-toggle="reply" aria-pressed="true">帮我回已开启</button>
+          <div class="persona-action-group">
+            <button class="persona-shortcut" type="button" data-persona-setup>设置默认风格</button>
+          </div>
+        </div>
+        <div class="persona-default-hint" id="replyPersonaHint"></div>
         <label>原消息</label>
         <div class="quote" id="quotedMsg"></div>
         <div class="voice-intent">
@@ -557,7 +627,18 @@
         <button class="close" data-close="spacePanel">×</button>
       </div>
       <div class="panel-body">
-        <button class="context-feature-toggle" type="button" data-feature-context-toggle="polish" aria-pressed="true">润色一下已开启</button>
+        <div class="persona-setup-banner">
+          <span>还没设置默认说话人格。可以先选一个默认风格，也可以暂时不设置。</span>
+          <button type="button" data-persona-setup>去选择</button>
+          <button type="button" data-persona-dismiss>暂不设置</button>
+        </div>
+        <div class="feature-style-row">
+          <button class="context-feature-toggle" type="button" data-feature-context-toggle="polish" aria-pressed="true">润色一下已开启</button>
+          <div class="persona-action-group">
+            <button class="persona-shortcut" type="button" data-persona-setup>设置默认风格</button>
+          </div>
+        </div>
+        <div class="persona-default-hint" id="spacePersonaHint"></div>
         <div class="space-current-draft">
           <label>当前说说草稿</label>
           <textarea id="spaceDraftPreview" rows="3" placeholder="可以直接在这里输入想发的内容，再选择风格润色。"></textarea>
@@ -596,6 +677,6 @@
     </section>
   </main>
 
-    <script src="scripts/app.js?v=20260505-context-switches"></script>
+    <script src="scripts/app.js?v=20260506-product-intro-featuregoose"></script>
 </body>
 </html>

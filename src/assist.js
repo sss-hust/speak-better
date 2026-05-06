@@ -83,9 +83,9 @@ async function generateAssist(input) {
 }
 
 function buildAssistBrief(task, input) {
-  const personaKey = String(input.personaKey || 'warm').trim() || 'warm';
-  const personaLabel = String(input.personaLabel || '').trim() || getPersonaLabel(personaKey);
-  const personaDesc = String(input.personaDesc || '').trim() || getPersonaDesc(personaKey);
+  const personaKey = String(input.personaKey || '').trim();
+  const personaLabel = String(input.personaLabel || '').trim() || (personaKey ? getPersonaLabel(personaKey) : '');
+  const personaDesc = String(input.personaDesc || '').trim() || (personaKey ? getPersonaDesc(personaKey) : '');
   const readSummary = String(input.readSummary || '').trim();
   const threadTitle = String(input.threadTitle || '').trim();
   const conversation = normalizeConversation(input.conversation);
@@ -161,7 +161,9 @@ function buildAssistMessages(brief) {
   const conversationText = brief.conversation.length
     ? brief.conversation.map((item) => `${item.role === 'me' ? '我' : '对方'}：${item.text}`).join('\n')
     : '无';
-  const readStyleText = brief.readSummary || `当前默认人格是「${brief.personaLabel}」：${brief.personaDesc}`;
+  const readStyleText = brief.readSummary || (brief.personaLabel
+    ? `当前默认人格是「${brief.personaLabel}」：${brief.personaDesc}`
+    : '用户尚未设置默认人格，本次只根据用户当前输入和手动选择的选项生成。');
   const taskRules = getTaskRules(brief);
   const angleText = getTaskAngles(brief).map((item, index) => `${index + 1}. ${item}`).join('\n');
   const bannedText = getAssistBannedPhrases(brief).join('、');
@@ -182,8 +184,8 @@ function buildAssistMessages(brief) {
       content: [
         `任务：${brief.taskLabel}`,
         `目标：${brief.goal}`,
-        `当前人格：${brief.personaLabel}`,
-        `人格描述：${brief.personaDesc}`,
+        `当前人格：${brief.personaLabel || '未设置'}`,
+        `人格描述：${brief.personaDesc || '无默认人格'}`,
         `聊天或内容主题：${brief.subject}`,
         `线程标题：${brief.threadTitle || '无'}`,
         `最近聊天上下文：\n${conversationText}`,
